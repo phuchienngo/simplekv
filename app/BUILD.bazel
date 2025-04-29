@@ -1,0 +1,23 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_binary", "kt_jvm_library")
+
+kt_jvm_library(
+    name = "main_app_lib",
+    srcs = glob(["MainApp.kt"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_lmax_disruptor",
+        "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_slf4j_slf4j_simple",
+    ],
+)
+
+kt_jvm_binary(
+    name = "main_app",
+    srcs = ["MainApp.kt"],
+    main_class = "app.MainApp",
+    deps = [
+        ":main_app_lib",
+    ],
+)
