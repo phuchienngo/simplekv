@@ -1,0 +1,18 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_binary", "kt_jvm_library")
+
+kt_jvm_library(
+    name = "server",
+    srcs = glob([
+        "AcceptThread.kt",
+        "SelectorThread.kt",
+        "Server.kt",
+        "Session.kt",
+    ]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//app/utils",
+        "@maven//:com_lmax_disruptor",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_slf4j_slf4j_simple",
+    ],
+)

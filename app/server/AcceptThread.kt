@@ -1,0 +1,93 @@
+package app.server
+
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import java.io.IOException
+import java.nio.channels.SelectionKey
+import java.nio.channels.Selector
+import java.nio.channels.ServerSocketChannel
+import java.nio.channels.spi.SelectorProvider
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+
+class AcceptThread: Thread {
+  companion object {
+    private val LOG: Logger = LoggerFactory.getLogger(AcceptThread::class.java)
+  }
+  private val selectorThreads: List<SelectorThread>
+  private val serverChannel: ServerSocketChannel
+  private val acceptSelector: Selector
+  private val isRunning: AtomicBoolean
+  private val increment: AtomicLong
+
+  constructor(serverChannel: ServerSocketChannel, selectorThreads: List<SelectorThread>): super("AcceptThread") {
+    this.serverChannel = serverChannel
+    this.selectorThreads = selectorThreads
+    acceptSelector = SelectorProvider.provider().openSelector()
+    isRunning = AtomicBoolean(true)
+    increment = AtomicLong(0)
+    serverChannel.register(acceptSelector, SelectionKey.OP_ACCEPT)
+  }
+
+  override fun run() {
+    try {
+      while (isRunning.get()) {
+        select()
+      }
+    } catch (e: IOException) {
+      LOG.error("Accept Thread is exiting due to an unexpected error", e)
+    }
+
+    try {
+      acceptSelector.close()
+    } catch (e: IOException) {
+      LOG.error("Got an IOException while closing accept selector!", e)
+    }
+
+    for (selectorThread in selectorThreads) {
+      selectorThread.wakeup()
+    }
+  }
+
+  private fun select() {
+    try {
+      acceptSelector.select()
+      val selectorKeys = acceptSelector.selectedKeys()
+      val iterator = selectorKeys.iterator()
+      while (isRunning.get() && iterator.hasNext()) {
+        val selectionKey = iterator.next()
+        iterator.remove()
+        when {
+          !selectionKey.isValid -> continue
+          selectionKey.isAcceptable -> handleAccept()
+          else -> LOG.warn("Unexpected state [{}] in select!", selectionKey.interestOps())
+        }
+      }
+    } catch (e: IOException) {
+      LOG.warn("Encountered an error while selecting!", e);
+    }
+  }
+
+  private fun handleAccept() {
+    try {
+      val clientChannel = serverChannel.accept()
+      clientChannel.configureBlocking(false)
+      val targetIndex = increment.incrementAndGet() % selectorThreads.size
+      val selectorThread = selectorThreads[targetIndex.toInt()]
+      if (!selectorThread.addAcceptedConnection(clientChannel)) {
+        clientChannel.close()
+      }
+    } catch (e: IOException) {
+      LOG.error("Error accepting connection", e)
+    }
+  }
+
+  fun wakeup() {
+    acceptSelector.wakeup()
+  }
+
+  fun stopRunning(): Boolean {
+    wakeup()
+    return isRunning.compareAndSet(true, false)
+  }
+}
