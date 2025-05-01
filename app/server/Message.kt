@@ -80,6 +80,7 @@ class Message(
     return slice
   }
 
+  @Suppress("SameReturnValue")
   fun write(): Boolean {
     if (state == State.WRITING) {
       try {
@@ -113,8 +114,7 @@ class Message(
   }
 
   fun done() {
-    state = State.READING_HEADER
-    requestInterestChange()
+    prepareRead()
   }
 
   private fun changeSelectInterests() {

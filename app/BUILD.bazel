@@ -16,7 +16,6 @@ kt_jvm_binary(
         "MainApp.kt",
         "core/Body.kt",
         "core/CommandOpCodes.kt",
-        "core/Errors.kt",
         "core/Event.kt",
         "core/Header.kt",
         "core/ResponseStatus.kt",
@@ -27,6 +26,9 @@ kt_jvm_binary(
         "server/Message.kt",
         "server/SelectorThread.kt",
         "server/Server.kt",
+        "utils/Commands.kt",
+        "utils/Responses.kt",
+        "utils/Validators.kt",
     ],
     main_class = "app.MainApp",
     deps = [
