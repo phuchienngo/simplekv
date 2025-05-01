@@ -24,10 +24,10 @@ object Responses {
     return responseBuffer
   }
 
-  fun makeResponse(header: Header, extras: ByteBuffer?, key: ByteBuffer?, value: ByteBuffer?): ByteBuffer {
-    val extrasLength = extras?.remaining() ?: 0
-    val keyLength = key?.remaining() ?: 0
-    val valueLength = value?.remaining() ?: 0
+  fun makeResponse(header: Header, cas: Long, extras: ByteBuffer?, key: ByteBuffer?, value: ByteBuffer?): ByteBuffer {
+    val extrasLength = extras?.capacity() ?: 0
+    val keyLength = key?.capacity() ?: 0
+    val valueLength = value?.capacity() ?: 0
     val totalBodyLength = extrasLength + keyLength + valueLength
     val responseBuffer = ByteBuffer.allocate(24 + totalBodyLength)
     responseBuffer.put(0x81.toByte()) // magic
@@ -38,7 +38,7 @@ object Responses {
     responseBuffer.putShort(0) // status
     responseBuffer.putInt(totalBodyLength) // total body length
     responseBuffer.putInt(header.opaque) // opaque
-    responseBuffer.putLong(header.cas) // cas
+    responseBuffer.putLong(cas) // cas
     extras?.let(responseBuffer::put)
     key?.let(responseBuffer::put)
     value?.let(responseBuffer::put)

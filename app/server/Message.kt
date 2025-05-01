@@ -24,11 +24,13 @@ class Message(
   lateinit var body: Body
   private lateinit var responseBuffer: ByteBuffer
 
+  @JvmSynthetic
   internal fun isLoaded(): Boolean {
     return state == State.READ_BODY_COMPLETE
   }
 
-  fun read(): Boolean {
+  @JvmSynthetic
+  internal fun read(): Boolean {
     if (state == State.READING_HEADER) {
       if (!internalRead()) {
         return false
@@ -80,8 +82,9 @@ class Message(
     return slice
   }
 
+  @JvmSynthetic
   @Suppress("SameReturnValue")
-  fun write(): Boolean {
+  internal fun write(): Boolean {
     if (state == State.WRITING) {
       try {
         channelSocket.write(responseBuffer)
@@ -99,7 +102,8 @@ class Message(
     return false
   }
 
-  fun requestInterestChange() {
+  @JvmSynthetic
+  internal fun requestInterestChange() {
     if (Thread.currentThread() === selectorThread) {
       changeSelectInterests()
     } else {
@@ -114,7 +118,8 @@ class Message(
   }
 
   fun done() {
-    prepareRead()
+    state = State.AWAITING_REGISTER_READ
+    requestInterestChange()
   }
 
   private fun changeSelectInterests() {
