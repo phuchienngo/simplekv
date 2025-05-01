@@ -14,6 +14,7 @@ kt_jvm_binary(
     name = "main_app",
     srcs = [
         "MainApp.kt",
+        "config/Config.kt",
         "core/Body.kt",
         "core/CommandOpCodes.kt",
         "core/ErrorCode.kt",
@@ -37,7 +38,16 @@ kt_jvm_binary(
         "utils/Responses.kt",
         "utils/Validators.kt",
     ],
+    args = [
+        "-p",
+        "11211",
+        "-n",
+        "simple-kv",
+        "-w",
+        "2",
+    ],
     jvm_flags = [
+        "-Xlog:gc*",
         "-Xms1G",
         "-Xmx4G",
         "-XX:+UseZGC",
@@ -50,6 +60,7 @@ kt_jvm_binary(
         "//app:data_structure_java_lib",
         "@maven//:com_google_guava_guava",
         "@maven//:com_lmax_disruptor",
+        "@maven//:commons_cli_commons_cli",
         "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_slf4j_slf4j_simple",

@@ -17,6 +17,7 @@ maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
     name = "maven",
     artifacts = [
+        "commons-cli:commons-cli:1.9.0",
         "com.google.guava:guava:33.4.8-jre",
         "com.lmax:disruptor:4.0.0",
         "org.jetbrains.kotlin:kotlin-stdlib:2.1.20",
