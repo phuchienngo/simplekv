@@ -10,9 +10,9 @@ import java.nio.channels.spi.SelectorProvider
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
-class AcceptThread: Thread {
+class AcceptorThread: Thread {
   companion object {
-    private val LOG: Logger = LoggerFactory.getLogger(AcceptThread::class.java)
+    private val LOG: Logger = LoggerFactory.getLogger(AcceptorThread::class.java)
   }
   private val server: Server
   private val selectorThreads: List<SelectorThread>
@@ -21,7 +21,7 @@ class AcceptThread: Thread {
   private val isRunning: AtomicBoolean
   private val increment: AtomicLong
 
-  constructor(server: Server, serverChannel: ServerSocketChannel, selectorThreads: List<SelectorThread>): super("AcceptThread") {
+  constructor(threadName: String, server: Server, serverChannel: ServerSocketChannel, selectorThreads: List<SelectorThread>): super(threadName) {
     this.server = server
     this.serverChannel = serverChannel
     this.selectorThreads = selectorThreads

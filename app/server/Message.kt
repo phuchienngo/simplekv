@@ -1,5 +1,7 @@
 package app.server
 
+import app.core.Body
+import app.core.Header
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -10,7 +12,7 @@ import java.nio.channels.SocketChannel
 class Message(
   val channelSocket: SocketChannel,
   val selectionKey: SelectionKey,
-  val selectorThread: SelectorThread
+  val selectorThread: SelectorThread,
 ) {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(Message::class.java)
@@ -18,12 +20,11 @@ class Message(
 
   private var state = State.READING_HEADER
   private var buffer: ByteBuffer = ByteBuffer.allocate(24)
-  private var responseBuffer: ByteBuffer? = null
+  lateinit var header: Header
+  lateinit var body: Body
+  private lateinit var responseBuffer: ByteBuffer
 
-  private var header: Header? = null
-  private var body: Body? = null
-
-  fun isLoaded(): Boolean {
+  internal fun isLoaded(): Boolean {
     return state == State.READ_BODY_COMPLETE
   }
 
@@ -36,54 +37,47 @@ class Message(
       if (!buffer.hasRemaining()) {
         buffer.flip()
         header = parseHeader(buffer)
-        if (!header!!.isMagicRequest()) {
+        if (!header.isMagicRequest()) {
           state = State.AWAITING_CLOSE
-          LOG.error("Invalid magic number in request: {}", header!!.magic)
+          LOG.error("Invalid magic number in request: {}", header.magic)
           return false
         }
-        buffer = ByteBuffer.allocate(header!!.totalBodyLength)
+        buffer = ByteBuffer.allocate(header.totalBodyLength)
         state = State.READING_BODY
       }
     }
 
     if (state == State.READING_BODY) {
-      if (!internalRead() || header == null) {
+      if (!internalRead()) {
         return false
       }
 
       if (!buffer.hasRemaining()) {
-        buffer.flip()
+        selectionKey.interestOps(0)
         state = State.READ_BODY_COMPLETE
-        val extrasLength = header!!.extrasLength
-        val keyLength = header!!.keyLength
-        val valueLength = header!!.valueLength
+        buffer.flip()
+        val extrasLength = header.extrasLength
+        val keyLength = header.keyLength
+        val valueLength = header.valueLength
         body = Body(
-          if (extrasLength > 0) {
-            val extras = ByteArray(extrasLength.toInt())
-            buffer.get(extras)
-            extras
-          } else {
-            null
-          },
-          if (keyLength > 0) {
-            val key = ByteArray(keyLength.toInt())
-            buffer.get(key)
-            key
-          } else {
-            null
-          },
-          if (valueLength > 0) {
-            val value = ByteArray(valueLength)
-            buffer.get(value)
-            value
-          } else {
-            null
-          }
+          slice(buffer, extrasLength.toInt()),
+          slice(buffer, keyLength.toInt()),
+          slice(buffer, valueLength)
         )
       }
     }
 
     return true
+  }
+
+  private fun slice(buffer: ByteBuffer, length: Int): ByteBuffer? {
+    if (length <= 0) {
+      return null
+    }
+    val start = buffer.position()
+    val slice = buffer.slice(start, length)
+    buffer.position(length)
+    return slice
   }
 
   fun write(): Boolean {
@@ -95,7 +89,7 @@ class Message(
         return false
       }
 
-      if (responseBuffer?.hasRemaining() != true) {
+      if (!responseBuffer.hasRemaining()) {
         prepareRead()
       }
     }
@@ -112,9 +106,14 @@ class Message(
     }
   }
 
-  // after process call this method
-  fun registerForWriteResponse() {
+  fun reply(buffer: ByteBuffer) {
+    responseBuffer = buffer
     state = State.AWAITING_REGISTER_WRITE
+    requestInterestChange()
+  }
+
+  fun done() {
+    state = State.READING_HEADER
     requestInterestChange()
   }
 
@@ -152,7 +151,6 @@ class Message(
     selectionKey.interestOps(SelectionKey.OP_READ)
     buffer = ByteBuffer.allocate(24)
     state = State.READING_HEADER
-
   }
 
   private fun parseHeader(buffer: ByteBuffer): Header {
@@ -186,54 +184,5 @@ class Message(
     WRITING,
     AWAITING_REGISTER_READ,
     AWAITING_CLOSE
-  }
-
-  data class Header(
-    val magic: Byte,
-    val opcode: Byte,
-    val keyLength: Short,
-    val extrasLength: Byte,
-    val dataType: Byte,
-    val status: Short, // vBucketId
-    val totalBodyLength: Int,
-    val opaque: Int,
-    val cas: Long
-  ) {
-    fun isMagicRequest(): Boolean {
-      return (magic.toInt() and 0xFF) == 0x80
-    }
-
-    fun isMagicResponse(): Boolean {
-      return (magic.toInt() and 0xFF) == 0x81
-    }
-
-    val valueLength: Int
-      get() = totalBodyLength - keyLength - extrasLength
-  }
-
-  data class Body(
-    val extras: ByteArray?,
-    val key: ByteArray?,
-    val value: ByteArray?
-  ) {
-    override fun equals(other: Any?): Boolean {
-      if (this === other) return true
-      if (javaClass != other?.javaClass) return false
-
-      other as Body
-
-      if (!extras.contentEquals(other.extras)) return false
-      if (!key.contentEquals(other.key)) return false
-      if (!value.contentEquals(other.value)) return false
-
-      return true
-    }
-
-    override fun hashCode(): Int {
-      var result = extras?.contentHashCode() ?: 0
-      result = 31 * result + (key?.contentHashCode() ?: 0)
-      result = 31 * result + (value?.contentHashCode() ?: 0)
-      return result
-    }
   }
 }

@@ -1,52 +1,61 @@
 package app.server
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import app.handler.Router
 import java.io.IOException
 import java.net.SocketAddress
 import java.nio.channels.ServerSocketChannel
 import java.util.concurrent.atomic.AtomicBoolean
 
 class Server(
+  serverName: String,
   private val bindingAddress: SocketAddress,
-  private val selectorNum: Int,
-  private val selectorHandler: (Message) -> Unit,
+  selectorNum: Int,
+  private val router: Router,
 ) {
-  companion object {
-    private val LOG: Logger = LoggerFactory.getLogger(Server::class.java)
+  private val isRunning = AtomicBoolean(false)
+  private val serverChannel: ServerSocketChannel = ServerSocketChannel.open()
+  private val acceptor: AcceptorThread
+  private val selectors: List<SelectorThread>
+
+  init {
+    serverChannel.configureBlocking(false)
+    selectors = (0 until selectorNum).map { index ->
+      return@map SelectorThread(
+        "$serverName-selector-$index",
+        this,
+        router
+      )
+    }
+    acceptor = AcceptorThread("$serverName-acceptor", this, serverChannel, selectors)
   }
-  private val isRunning = AtomicBoolean(true)
-  private lateinit var serverChannel: ServerSocketChannel
-  private lateinit var acceptThread: AcceptThread
-  private lateinit var selectorThreads: MutableList<SelectorThread>
 
   @Throws(IOException::class)
   fun start() {
-    serverChannel = ServerSocketChannel.open()
-    serverChannel.configureBlocking(false)
-    serverChannel.socket().bind(bindingAddress)
-    selectorThreads = mutableListOf()
-
-    for (i in 0 until selectorNum) {
-      val selectorThread = SelectorThread(this, "SelectorThread-$i", selectorHandler)
-      selectorThread.start()
-      selectorThreads.add(selectorThread)
+    if (!isRunning.compareAndSet(false, true)) {
+      return
     }
-
-    acceptThread = AcceptThread(this, serverChannel, selectorThreads)
-    acceptThread.start()
-    LOG.info("Server started on {}", bindingAddress)
+    router.start()
+    serverChannel.socket().bind(bindingAddress)
+    for (selectorThread in selectors) {
+      selectorThread.start()
+    }
+    acceptor.start()
   }
 
   fun stop() {
     if (!isRunning.compareAndSet(true, false)) {
       return
     }
-    LOG.info("Stopping server")
-    acceptThread.stopRunning()
-    for (selectorThread in selectorThreads) {
+    router.stop()
+    acceptor.stopRunning()
+    for (selectorThread in selectors) {
       selectorThread.stopRunning()
     }
     serverChannel.close()
+    Thread.sleep(200)
+    for (selectorThread in selectors) {
+      selectorThread.interrupt()
+    }
+    acceptor.interrupt()
   }
 }

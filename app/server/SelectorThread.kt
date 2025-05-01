@@ -1,26 +1,27 @@
 package app.server
 
+import app.handler.Router
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
 import java.nio.channels.spi.SelectorProvider
-import java.util.concurrent.LinkedBlockingDeque
+import java.util.concurrent.LinkedTransferQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class SelectorThread(
-  private val server: Server,
   threadName: String,
-  private val selectorHandler: (Message) -> Unit
+  private val server: Server,
+  private val router: Router
 ): Thread(threadName) {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(SelectorThread::class.java)
   }
   private val selector = SelectorProvider.provider().openSelector()
-  private val acceptedConnectionQueue = AtomicReference(LinkedBlockingDeque<SocketChannel>())
-  private val selectInterestChangesQueue = AtomicReference(LinkedBlockingDeque<Message>())
+  private val acceptedConnectionQueue = AtomicReference(LinkedTransferQueue<SocketChannel>())
+  private val selectInterestChangesQueue = AtomicReference(LinkedTransferQueue<Message>())
   private val isRunning: AtomicBoolean = AtomicBoolean(true)
 
   fun addAcceptedConnection(channel: SocketChannel): Boolean {
@@ -62,7 +63,7 @@ class SelectorThread(
   }
 
   private fun setupAcceptedConnection() {
-    val currentInQueue = acceptedConnectionQueue.getAndSet(LinkedBlockingDeque<SocketChannel>())
+    val currentInQueue = acceptedConnectionQueue.getAndSet(LinkedTransferQueue<SocketChannel>())
     while (currentInQueue.isNotEmpty()) {
       registerAcceptedConnection(currentInQueue.poll())
     }
@@ -90,7 +91,7 @@ class SelectorThread(
   }
 
   private fun changeInterestOpsSession() {
-    val currentInQueue = selectInterestChangesQueue.getAndSet(LinkedBlockingDeque<Message>())
+    val currentInQueue = selectInterestChangesQueue.getAndSet(LinkedTransferQueue<Message>())
     while (currentInQueue.isNotEmpty()) {
       val message = currentInQueue.poll()
       message.requestInterestChange()
@@ -107,7 +108,7 @@ class SelectorThread(
   }
 
   private fun select() {
-    var iterator: MutableIterator<SelectionKey>?
+    var iterator: MutableIterator<SelectionKey>
     try {
       val readyChannels = selector.selectNow()
       if (readyChannels == 0) {
@@ -141,7 +142,7 @@ class SelectorThread(
     }
 
     if (message.isLoaded()) {
-      selectorHandler(message)
+      router.handle(message)
     }
   }
 
