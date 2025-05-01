@@ -14,13 +14,15 @@ class AcceptThread: Thread {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(AcceptThread::class.java)
   }
+  private val server: Server
   private val selectorThreads: List<SelectorThread>
   private val serverChannel: ServerSocketChannel
   private val acceptSelector: Selector
   private val isRunning: AtomicBoolean
   private val increment: AtomicLong
 
-  constructor(serverChannel: ServerSocketChannel, selectorThreads: List<SelectorThread>): super("AcceptThread") {
+  constructor(server: Server, serverChannel: ServerSocketChannel, selectorThreads: List<SelectorThread>): super("AcceptThread") {
+    this.server = server
     this.serverChannel = serverChannel
     this.selectorThreads = selectorThreads
     acceptSelector = SelectorProvider.provider().openSelector()
@@ -47,6 +49,7 @@ class AcceptThread: Thread {
     for (selectorThread in selectorThreads) {
       selectorThread.wakeup()
     }
+    server.stop()
   }
 
   private fun select() {
@@ -86,8 +89,8 @@ class AcceptThread: Thread {
     acceptSelector.wakeup()
   }
 
-  fun stopRunning(): Boolean {
+  fun stopRunning() {
     wakeup()
-    return isRunning.compareAndSet(true, false)
+    isRunning.set(false)
   }
 }

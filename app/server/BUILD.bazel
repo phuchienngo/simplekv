@@ -6,11 +6,10 @@ kt_jvm_library(
         "AcceptThread.kt",
         "SelectorThread.kt",
         "Server.kt",
-        "Session.kt",
+        "Message.kt",
     ]),
     visibility = ["//visibility:public"],
     deps = [
-        "//app/utils",
         "@maven//:com_lmax_disruptor",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_slf4j_slf4j_simple",

@@ -22,7 +22,6 @@ maven.install(
         "org.slf4j:slf4j-simple:2.0.17",
         "org.slf4j:slf4j-api:2.0.17",
         "com.google.guava:guava:33.4.8-jre",
-        "org.apache.commons:commons-pool2:2.12.1",
         # Add other Maven dependencies here
     ],
     repositories = [
