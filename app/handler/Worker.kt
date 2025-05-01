@@ -3,15 +3,20 @@ package app.handler
 import app.core.CommandOpCodes
 import app.core.Event
 import app.datastructure.SwissMap
+import app.utils.Commands
 import com.lmax.disruptor.dsl.Disruptor
-import java.nio.ByteBuffer
-import java.nio.charset.CharsetDecoder
 
-class Worker(disruptor: Disruptor<Event>): AbstractWorker(disruptor), GetHandler, MutateHandler, DeleteHandler {
-  override val valueMap = SwissMap<String, ByteBuffer>()
-  override val extrasMap = SwissMap<String, ByteBuffer>()
+class Worker(
+  disruptor: Disruptor<Event>
+): AbstractWorker(disruptor),
+  GetHandler,
+  MutateHandler,
+  DeleteHandler,
+  IncrementDecrementHandler,
+  AppendPrependHandler {
+  override val valueMap = SwissMap<String, ByteArray>()
+  override val extrasMap = SwissMap<String, ByteArray>()
   override val casMap = SwissMap<String, Long>()
-  override val decoder: CharsetDecoder = Charsets.US_ASCII.newDecoder()
 
   override fun process(event: Event) {
     when (event.header.opcode) {
@@ -27,6 +32,14 @@ class Worker(disruptor: Disruptor<Event>): AbstractWorker(disruptor), GetHandler
       CommandOpCodes.REPLACEQ.value -> processMutateCommand(event, CommandOpCodes.REPLACEQ)
       CommandOpCodes.DELETE.value -> processDeleteCommand(event, CommandOpCodes.DELETE)
       CommandOpCodes.DELETEQ.value -> processDeleteCommand(event, CommandOpCodes.DELETEQ)
+      CommandOpCodes.INCREMENT.value -> processIncrementDecrementCommand(event, CommandOpCodes.INCREMENT)
+      CommandOpCodes.INCREMENTQ.value -> processIncrementDecrementCommand(event, CommandOpCodes.INCREMENTQ)
+      CommandOpCodes.DECREMENT.value -> processIncrementDecrementCommand(event, CommandOpCodes.DECREMENT)
+      CommandOpCodes.DECREMENTQ.value -> processIncrementDecrementCommand(event, CommandOpCodes.DECREMENTQ)
+      CommandOpCodes.APPEND.value -> processAppendPrependCommand(event, CommandOpCodes.APPEND)
+      CommandOpCodes.APPENDQ.value -> processAppendPrependCommand(event, CommandOpCodes.APPENDQ)
+      CommandOpCodes.PREPEND.value -> processAppendPrependCommand(event, CommandOpCodes.PREPEND)
+      CommandOpCodes.PREPENDQ.value -> processAppendPrependCommand(event, CommandOpCodes.PREPENDQ)
       else -> processUnknownCommand(event)
     }
   }

@@ -1,8 +1,12 @@
 package app.handler
 
+import app.core.CommandOpCodes
+import app.core.ResponseStatus
 import app.server.Message
+import app.utils.Responses
 import com.google.common.hash.HashFunction
 import com.google.common.hash.Hashing
+import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
 class Router(
@@ -39,7 +43,21 @@ class Router(
   }
 
   private fun handleNullKeyRequest(message: Message) {
-    // TODO: Handle null key request
+    when (message.header.opcode) {
+      CommandOpCodes.NOOP.value -> {
+        val response = Responses.makeResponse(message.header, 0, null, null, null)
+        message.reply(response)
+      }
+      CommandOpCodes.VERSION.value -> {
+        val version = ByteBuffer.wrap("1.0.0".toByteArray())
+        val response = Responses.makeResponse(message.header, 0, null, null, version)
+        message.reply(response)
+      }
+      else -> {
+        val response = Responses.makeError(message.header, ResponseStatus.UnknownCommand)
+        message.reply(response)
+      }
+    }
   }
 
   private fun handleRequest(message: Message) {

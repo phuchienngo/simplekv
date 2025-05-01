@@ -4,20 +4,14 @@ import app.core.Event
 import app.core.ResponseStatus
 import app.datastructure.SwissMap
 import app.utils.Responses
-import java.nio.ByteBuffer
-import java.nio.charset.CharsetDecoder
 
 interface BaseHandler {
-  val decoder: CharsetDecoder
-  val valueMap: SwissMap<String, ByteBuffer>
-  val extrasMap: SwissMap<String, ByteBuffer>
+  val valueMap: SwissMap<String, ByteArray>
+  val extrasMap: SwissMap<String, ByteArray>
   val casMap: SwissMap<String, Long>
 
-  fun decodeKey(buffer: ByteBuffer): String {
-    decoder.reset()
-    val charBuffer = decoder.decode(buffer)
-    buffer.position(0)
-    return charBuffer.toString()
+  fun decodeKey(buffer: ByteArray): String {
+    return String(buffer, Charsets.US_ASCII)
   }
 
   fun processUnknownCommand(event: Event) {

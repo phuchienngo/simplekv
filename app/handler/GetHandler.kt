@@ -6,6 +6,7 @@ import app.core.ResponseStatus
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
+import java.nio.ByteBuffer
 
 interface GetHandler: BaseHandler {
   fun processGetCommand(event: Event, command: CommandOpCodes) {
@@ -32,13 +33,13 @@ interface GetHandler: BaseHandler {
     val response = Responses.makeResponse(
       event.header,
       cas,
-      extras,
+      extras?.let(ByteBuffer::wrap),
       if (command == CommandOpCodes.GETK || command == CommandOpCodes.GETKQ) {
-        event.body.key
+        event.body.key?.let(ByteBuffer::wrap)
       } else {
         null
       },
-      value
+      value?.let(ByteBuffer::wrap)
     )
     event.reply(response)
   }

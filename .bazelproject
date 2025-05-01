@@ -15,13 +15,4 @@ targets:
   //app:main_app
 
 additional_languages:
-  # Uncomment any additional languages you want supported
-  # android
-  # dart
-  # go
-  # javascript
-  # typescript
   kotlin
-  # go
-  scala
-  python

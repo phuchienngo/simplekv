@@ -6,7 +6,6 @@ import app.core.ResponseStatus
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
-import java.nio.ByteBuffer
 
 interface MutateHandler: BaseHandler {
   fun processMutateCommand(event: Event, command: CommandOpCodes) {
@@ -24,7 +23,7 @@ interface MutateHandler: BaseHandler {
       return
     }
     val extras = event.body.extras
-    val value = event.body.value ?: ByteBuffer.allocate(0)
+    val value = event.body.value ?: ByteArray(0)
     val now = System.currentTimeMillis()
 
     when (command) {
@@ -47,11 +46,11 @@ interface MutateHandler: BaseHandler {
         }
         addOrUpdateAndReply(command, event, key, value, extras, now)
       }
-      else -> event.done() // never reached
+      else -> {} // never reached
     }
   }
 
-  private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteBuffer?, extras: ByteBuffer?, cas: Long) {
+  private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteArray?, extras: ByteArray?, cas: Long) {
     valueMap[key] = value
     extrasMap[key] = extras
     casMap[key] = cas

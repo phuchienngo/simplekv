@@ -22,7 +22,7 @@ import static java.util.Arrays.fill;
 import static java.util.Objects.requireNonNull;
 
 /**
- * @author Baoyi Chen
+ * @source https://github.com/nextopcn/swiss-map
  */
 @SuppressWarnings("ALL")
 public class SwissMap<K, V> extends AbstractMap<K, V> {

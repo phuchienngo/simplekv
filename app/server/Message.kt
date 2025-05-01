@@ -58,13 +58,13 @@ class Message(
         selectionKey.interestOps(0)
         state = State.READ_BODY_COMPLETE
         buffer.flip()
-        val extrasLength = header.extrasLength
-        val keyLength = header.keyLength
+        val extrasLength = header.extrasLength.toInt()
+        val keyLength = header.keyLength.toInt()
         val valueLength = header.valueLength
         body = Body(
-          slice(buffer, extrasLength.toInt()),
-          slice(buffer, keyLength.toInt()),
-          slice(buffer, valueLength)
+          slice(buffer, 0, extrasLength),
+          slice(buffer,  extrasLength, keyLength),
+          slice(buffer, extrasLength + keyLength, valueLength)
         )
       }
     }
@@ -72,14 +72,15 @@ class Message(
     return true
   }
 
-  private fun slice(buffer: ByteBuffer, length: Int): ByteBuffer? {
-    if (length <= 0) {
+  private fun slice(buffer: ByteBuffer, offset: Int, length: Int): ByteArray? {
+    if (offset < 0 || length <= 0) {
       return null
     }
-    val start = buffer.position()
-    val slice = buffer.slice(start, length)
-    buffer.position(length)
-    return slice
+    buffer.position(0)
+    val dst = ByteArray(length)
+    buffer.get(dst, offset, length)
+    buffer.position(0)
+    return dst
   }
 
   @JvmSynthetic

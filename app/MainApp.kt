@@ -21,7 +21,7 @@ object MainApp {
   @JvmStatic
   fun main(args: Array<String>) {
     val port = 11211
-    val coreNumber = Runtime.getRuntime().availableProcessors()
+    val coreNumber = Runtime.getRuntime().availableProcessors() / 2
     val hashFunction = Hashing.crc32c()
     val router = setupRouter(coreNumber, hashFunction)
     val server = Server(

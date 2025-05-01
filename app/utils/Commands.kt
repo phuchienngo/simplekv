@@ -12,9 +12,7 @@ object Commands {
         || command == CommandOpCodes.APPENDQ
         || command == CommandOpCodes.PREPENDQ
         || command == CommandOpCodes.DELETEQ
-        || command == CommandOpCodes.FLUSHQ
         || command == CommandOpCodes.INCREMENTQ
         || command == CommandOpCodes.DECREMENTQ
-        || command == CommandOpCodes.QUITQ
   }
 }

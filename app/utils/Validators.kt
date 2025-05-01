@@ -12,33 +12,31 @@ object Validators {
   fun hasExtras(event: Event): Boolean {
     return event.header.extrasLength > BYTE_ZERO
         && event.body.extras != null
-        && event.body.extras?.position() == event.body.extras?.capacity()
+        && event.header.extrasLength.toInt() == event.body.extras?.size
   }
 
   fun hasKey(event: Event): Boolean {
-    if (event.header.keyLength <= SHORT_ZERO || event.header.keyLength > SHORT_250) {
+    if (event.header.keyLength <= SHORT_ZERO
+      || event.header.keyLength > SHORT_250
+      || event.body.key == null
+      || event.body.key?.size != event.header.keyLength.toInt()) {
       return false
     }
     val buffer = event.body.key
-    if (buffer == null || buffer.position() < buffer.capacity()) {
+    if (buffer == null) {
       return false
     }
-    while (buffer.hasRemaining()) {
-      val b = buffer.get()
+    for (b in event.body.key!!) {
       if (b <= BYTE_32 || b == BYTE_127) {
         return false
       }
     }
-    buffer.position(0)
-    return event.header.keyLength > SHORT_ZERO
-        && event.header.keyLength <= SHORT_250
-        && event.body.key != null
-        && event.body.key?.position() == event.body.key?.capacity()
+    return true
   }
 
   fun hasValue(event: Event): Boolean {
     return event.header.valueLength > 0
         && event.body.value != null
-        && event.body.value?.position() == event.body.value?.capacity()
+        && event.body.value?.size == event.header.valueLength
   }
 }
