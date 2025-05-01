@@ -2,7 +2,7 @@ package app.handler
 
 import app.core.CommandOpCodes
 import app.core.Event
-import app.core.ResponseStatus
+import app.core.ErrorCode
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
@@ -11,7 +11,7 @@ interface DeleteHandler: BaseHandler {
   @Suppress("DuplicatedCode")
   fun processDeleteCommand(event: Event, command: CommandOpCodes) {
     if (Validators.hasExtras(event) || Validators.hasValue(event) || !Validators.hasKey(event)) {
-      val response = Responses.makeError(event.header, ResponseStatus.InvalidArguments)
+      val response = Responses.makeError(event.header, ErrorCode.InvalidArguments)
       event.reply(response)
       return
     }
@@ -21,7 +21,7 @@ interface DeleteHandler: BaseHandler {
       if (Commands.isQuietCommand(command)) {
         event.done()
       } else {
-        val response = Responses.makeError(event.header, ResponseStatus.KeyNotFound)
+        val response = Responses.makeError(event.header, ErrorCode.KeyNotFound)
         event.reply(response)
       }
       return
@@ -30,7 +30,7 @@ interface DeleteHandler: BaseHandler {
     val currentCas = casMap[key]
     val requestCas = event.header.cas
     if (requestCas != 0L && requestCas != currentCas) {
-      val response = Responses.makeError(event.header, ResponseStatus.KeyExists)
+      val response = Responses.makeError(event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }

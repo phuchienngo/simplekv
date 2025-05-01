@@ -1,7 +1,7 @@
 package app.handler
 
 import app.core.Event
-import app.core.ResponseStatus
+import app.core.ErrorCode
 import app.datastructure.SwissMap
 import app.utils.Responses
 
@@ -15,7 +15,7 @@ interface BaseHandler {
   }
 
   fun processUnknownCommand(event: Event) {
-    val response = Responses.makeError(event.header, ResponseStatus.UnknownCommand)
+    val response = Responses.makeError(event.header, ErrorCode.UnknownCommand)
     event.reply(response)
   }
 }

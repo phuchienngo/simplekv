@@ -2,7 +2,7 @@ package app.handler
 
 import app.core.CommandOpCodes
 import app.core.Event
-import app.core.ResponseStatus
+import app.core.ErrorCode
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
@@ -11,7 +11,7 @@ import java.nio.ByteBuffer
 interface IncrementDecrementHandler: BaseHandler {
   fun processIncrementDecrementCommand(event: Event, command: CommandOpCodes) {
     if (!Validators.hasExtras(event) || !Validators.hasKey(event) || Validators.hasValue(event)) {
-      val response = Responses.makeError(event.header, ResponseStatus.InvalidArguments)
+      val response = Responses.makeError(event.header, ErrorCode.InvalidArguments)
       event.reply(response)
       return
     }
@@ -26,7 +26,7 @@ interface IncrementDecrementHandler: BaseHandler {
     val isKeyExists = valueMap.containsKey(key)
 
     if (isKeyExists && event.header.cas != 0L && event.header.cas != casMap[key]) {
-      val response = Responses.makeError(event.header, ResponseStatus.KeyExists)
+      val response = Responses.makeError(event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }
@@ -34,7 +34,7 @@ interface IncrementDecrementHandler: BaseHandler {
     val now = System.currentTimeMillis()
     if (!isKeyExists) {
       if (expiration == 0xFFFFFFFF.toInt()) {
-        val response = Responses.makeError(event.header, ResponseStatus.KeyNotFound)
+        val response = Responses.makeError(event.header, ErrorCode.KeyNotFound)
         event.reply(response)
         return
       }

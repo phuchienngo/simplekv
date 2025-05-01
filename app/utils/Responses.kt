@@ -1,12 +1,12 @@
 package app.utils
 
 import app.core.Header
-import app.core.ResponseStatus
+import app.core.ErrorCode
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 object Responses {
-  fun makeError(header: Header, error: ResponseStatus): ByteBuffer {
+  fun makeError(header: Header, error: ErrorCode): ByteBuffer {
     val errorMessage = error.description.toByteArray(StandardCharsets.US_ASCII)
     val errorLength = errorMessage.size
     val responseBuffer = ByteBuffer.allocate(24 + errorLength)
@@ -35,7 +35,7 @@ object Responses {
     responseBuffer.putShort(keyLength.toShort()) // key length
     responseBuffer.put(extrasLength.toByte()) // extras length
     responseBuffer.put(0) // data type
-    responseBuffer.putShort(0) // status
+    responseBuffer.putShort(ErrorCode.NoError.code) // status
     responseBuffer.putInt(totalBodyLength) // total body length
     responseBuffer.putInt(header.opaque) // opaque
     responseBuffer.putLong(cas) // cas

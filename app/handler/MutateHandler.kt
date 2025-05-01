@@ -2,7 +2,7 @@ package app.handler
 
 import app.core.CommandOpCodes
 import app.core.Event
-import app.core.ResponseStatus
+import app.core.ErrorCode
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
@@ -10,7 +10,7 @@ import app.utils.Validators
 interface MutateHandler: BaseHandler {
   fun processMutateCommand(event: Event, command: CommandOpCodes) {
     if (!Validators.hasExtras(event) || !Validators.hasKey(event)) {
-      val response = Responses.makeError(event.header, ResponseStatus.InvalidArguments)
+      val response = Responses.makeError(event.header, ErrorCode.InvalidArguments)
       event.reply(response)
       return
     }
@@ -18,7 +18,7 @@ interface MutateHandler: BaseHandler {
     val currentCas = casMap.get(key)
     val requestCas = event.header.cas
     if (requestCas != 0L && requestCas != currentCas) {
-      val response = Responses.makeError(event.header, ResponseStatus.KeyExists)
+      val response = Responses.makeError(event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }
@@ -32,7 +32,7 @@ interface MutateHandler: BaseHandler {
       }
       CommandOpCodes.ADD, CommandOpCodes.ADDQ -> {
         if (valueMap.containsKey(key)) {
-          val response = Responses.makeError(event.header, ResponseStatus.KeyExists)
+          val response = Responses.makeError(event.header, ErrorCode.KeyExists)
           event.reply(response)
           return
         }
@@ -40,7 +40,7 @@ interface MutateHandler: BaseHandler {
       }
       CommandOpCodes.REPLACE, CommandOpCodes.REPLACEQ -> {
         if (!valueMap.containsKey(key)) {
-          val response = Responses.makeError(event.header, ResponseStatus.KeyNotFound)
+          val response = Responses.makeError(event.header, ErrorCode.KeyNotFound)
           event.reply(response)
           return
         }

@@ -1,6 +1,7 @@
 package app
 
 import app.core.Event
+import app.handler.GlobalExceptionHandler
 import app.handler.Router
 import app.handler.Worker
 import app.server.Server
@@ -64,6 +65,7 @@ object MainApp {
     )
     val worker = Worker(disruptor)
     disruptor.handleEventsWith(worker)
+    disruptor.setDefaultExceptionHandler(GlobalExceptionHandler.INSTANCE)
     return worker
   }
 }

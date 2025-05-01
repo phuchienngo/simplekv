@@ -1,6 +1,6 @@
 package app.core
 
-enum class ResponseStatus(val code: Short, val description: String) {
+enum class ErrorCode(val code: Short, val description: String) {
   NoError(0x0000, "No error"),
   KeyNotFound(0x0001, "Key not found"),
   KeyExists(0x0002, "Key exists"),

@@ -1,7 +1,7 @@
 package app.handler
 
 import app.core.CommandOpCodes
-import app.core.ResponseStatus
+import app.core.ErrorCode
 import app.server.Message
 import app.utils.Responses
 import com.google.common.hash.HashFunction
@@ -53,8 +53,16 @@ class Router(
         val response = Responses.makeResponse(message.header, 0, null, null, version)
         message.reply(response)
       }
+      CommandOpCodes.QUIT.value,
+      CommandOpCodes.QUITQ.value,
+      CommandOpCodes.FLUSH.value,
+      CommandOpCodes.FLUSHQ.value,
+      CommandOpCodes.STAT.value -> {
+        val response = Responses.makeError(message.header, ErrorCode.NotSupported)
+        message.reply(response)
+      }
       else -> {
-        val response = Responses.makeError(message.header, ResponseStatus.UnknownCommand)
+        val response = Responses.makeError(message.header, ErrorCode.UnknownCommand)
         message.reply(response)
       }
     }
