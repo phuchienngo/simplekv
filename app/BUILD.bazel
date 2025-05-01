@@ -38,14 +38,6 @@ kt_jvm_binary(
         "utils/Responses.kt",
         "utils/Validators.kt",
     ],
-    args = [
-        "-p",
-        "11211",
-        "-n",
-        "simple-kv",
-        "-w",
-        "2",
-    ],
     jvm_flags = [
         "-Xlog:gc*",
         "-Xms1G",

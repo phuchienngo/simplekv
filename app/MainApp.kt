@@ -31,15 +31,16 @@ object MainApp {
       LOG.error("Failed to parse command line arguments")
       return
     }
-    val (serverName, port, workerNum) = configResult.getOrNull()!!
+    val (serverName, port, workerNum, selectorNum) = configResult.getOrNull()!!
     LOG.info("Application pid: {}", ProcessHandle.current().pid())
     LOG.info("Setting up {} worker(s)", workerNum)
     val hashFunction = Hashing.crc32c()
     val router = setupRouter(serverName, workerNum, hashFunction)
+    LOG.info("Setting up {} selector(s)", selectorNum)
     val server = Server(
       serverName,
       InetSocketAddress(port),
-      workerNum,
+      selectorNum,
       router
     )
 
@@ -92,18 +93,28 @@ object MainApp {
 
     options.addOption(
       Option.builder("n")
-        .longOpt("name")
+        .longOpt("server_name")
         .hasArg()
-        .argName("NAME")
+        .argName("SERVER_NAME")
         .required(true)
         .build()
     )
 
     options.addOption(
       Option.builder("w")
-        .longOpt("workers")
+        .longOpt("worker_num")
         .hasArg()
-        .argName("NUM")
+        .argName("WORKER_NUM")
+        .required(true)
+        .type(Number::class.java)
+        .build()
+    )
+
+    options.addOption(
+      Option.builder("s")
+        .longOpt("selector_num")
+        .hasArg()
+        .argName("SELECTOR_NUM")
         .required(true)
         .type(Number::class.java)
         .build()
@@ -115,6 +126,7 @@ object MainApp {
       val port = cmd.getOptionValue("p").toInt()
       val serverName = cmd.getOptionValue("n")
       val workerNum = cmd.getOptionValue("w").toInt()
+      val selectorNum = cmd.getOptionValue("s").toInt()
       if (port < 0 || port > 65535) {
         throw IllegalArgumentException("Port number must be between 0 and 65535")
       }
@@ -124,10 +136,14 @@ object MainApp {
       if (serverName.isBlank()) {
         throw IllegalArgumentException("Server name cannot be empty")
       }
+      if (selectorNum <= 0) {
+        throw IllegalArgumentException("Selector number must be greater than 0")
+      }
       val config = Config(
         serverName = serverName,
         port = port,
-        workerNum = workerNum
+        workerNum = workerNum,
+        selectorNum = selectorNum
       )
       return Result.success(config)
     } catch (e: Exception) {
