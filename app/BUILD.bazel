@@ -36,6 +36,15 @@ kt_jvm_binary(
         "utils/Responses.kt",
         "utils/Validators.kt",
     ],
+    jvm_flags = [
+        "-Xms1G",
+        "-Xmx4G",
+        "-XX:+UseZGC",
+        "-XX:+ZGenerational",
+        "-XX:InitiatingHeapOccupancyPercent=70",
+        "-XX:+UseLargePages",
+        "-XX:SoftMaxHeapSize=1536m",
+    ],
     main_class = "app.MainApp",
     deps = [
         "//app:data_structure_java_lib",

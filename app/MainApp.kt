@@ -7,7 +7,7 @@ import app.server.Server
 import com.google.common.hash.HashFunction
 import com.google.common.hash.Hashing
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.lmax.disruptor.SleepingWaitStrategy
+import com.lmax.disruptor.YieldingWaitStrategy
 import com.lmax.disruptor.dsl.Disruptor
 import com.lmax.disruptor.dsl.ProducerType
 import org.slf4j.Logger
@@ -21,13 +21,15 @@ object MainApp {
   @JvmStatic
   fun main(args: Array<String>) {
     val port = 11211
-    val coreNumber = Runtime.getRuntime().availableProcessors() / 2
+    val workerNum = 2
+    LOG.info("Application pid: {}", ProcessHandle.current().pid())
+    LOG.info("Setting up {} worker(s)", workerNum)
     val hashFunction = Hashing.crc32c()
-    val router = setupRouter(coreNumber, hashFunction)
+    val router = setupRouter(workerNum, hashFunction)
     val server = Server(
       "simple-kv",
       InetSocketAddress(port),
-      coreNumber,
+      workerNum,
       router
     )
 
@@ -58,7 +60,7 @@ object MainApp {
       1024,
       threadFactory,
       ProducerType.MULTI,
-      SleepingWaitStrategy()
+      YieldingWaitStrategy()
     )
     val worker = Worker(disruptor)
     disruptor.handleEventsWith(worker)
