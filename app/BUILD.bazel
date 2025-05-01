@@ -1,4 +1,14 @@
-load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_binary", "kt_jvm_library")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_binary")
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "data_structure_java_lib",
+    srcs = glob(["datastructure/SwissMap.java"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "@maven//:org_jetbrains_annotations",
+    ],
+)
 
 kt_jvm_binary(
     name = "main_app",
@@ -20,6 +30,7 @@ kt_jvm_binary(
     ],
     main_class = "app.MainApp",
     deps = [
+        "//app:data_structure_java_lib",
         "@maven//:com_google_guava_guava",
         "@maven//:com_lmax_disruptor",
         "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
