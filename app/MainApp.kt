@@ -35,7 +35,7 @@ object MainApp {
     LOG.info("Application pid: {}", ProcessHandle.current().pid())
     LOG.info("Setting up {} worker(s)", workerNum)
     val hashFunction = Hashing.crc32c()
-    val router = setupRouter(serverName, workerNum, hashFunction)
+    val router = setupRouter(serverName, workerNum, selectorNum, hashFunction)
     LOG.info("Setting up {} selector(s)", selectorNum)
     val server = Server(
       serverName,
@@ -55,11 +55,11 @@ object MainApp {
     })
   }
 
-  private fun setupRouter(serverName: String, workerNum: Int, hashFunction: HashFunction): Router {
+  private fun setupRouter(serverName: String, workerNum: Int, selectorNum: Int, hashFunction: HashFunction): Router {
     val threadFactory = ThreadFactoryBuilder()
       .setNameFormat("$serverName-worker-%d")
       .build()
-    val producerType = if (workerNum == 1) {
+    val producerType = if (selectorNum == 1) {
       ProducerType.SINGLE
     } else {
       ProducerType.MULTI

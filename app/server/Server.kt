@@ -68,7 +68,7 @@ class Server(
       Container.FACTORY,
       1024,
       null,
-      ProducerType.MULTI,
+      ProducerType.SINGLE,
       YieldingWaitStrategy()
     )
   }
