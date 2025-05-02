@@ -2,7 +2,6 @@ package app.server
 
 import app.core.Body
 import app.core.Header
-import com.google.common.base.Stopwatch
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -19,7 +18,6 @@ class Message(
     private val LOG: Logger = LoggerFactory.getLogger(Message::class.java)
   }
 
-  private val stopwatch = Stopwatch.createUnstarted()
   private var state = State.READING_HEADER
   private var buffer: ByteBuffer = ByteBuffer.allocate(24)
   lateinit var header: Header
@@ -59,7 +57,6 @@ class Message(
       if (!buffer.hasRemaining()) {
         selectionKey.interestOps(0)
         state = State.READ_BODY_COMPLETE
-        stopwatch.start()
         buffer.flip()
         val extrasLength = header.extrasLength.toInt()
         val keyLength = header.keyLength.toInt()
@@ -159,9 +156,6 @@ class Message(
     selectionKey.interestOps(SelectionKey.OP_READ)
     buffer = ByteBuffer.allocate(24)
     state = State.READING_HEADER
-    LOG.info("Elapsed time: {} ns", stopwatch.elapsed().toNanos())
-    stopwatch.stop()
-    stopwatch.reset()
   }
 
   private fun parseHeader(buffer: ByteBuffer): Header {

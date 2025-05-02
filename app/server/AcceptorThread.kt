@@ -73,7 +73,6 @@ class AcceptorThread: Thread {
 
   private fun handleAccept() {
     try {
-      LOG.info("Accepting connection")
       val clientChannel = serverChannel.accept()
       clientChannel.configureBlocking(false)
       val targetIndex = increment.incrementAndGet() % selectorThreads.size
