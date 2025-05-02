@@ -6,6 +6,7 @@ import app.core.ErrorCode
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
+import com.google.common.primitives.Longs
 import java.nio.ByteBuffer
 
 interface IncrementDecrementHandler: BaseHandler {
@@ -76,7 +77,7 @@ interface IncrementDecrementHandler: BaseHandler {
         cas,
         null,
         null,
-        ByteBuffer.wrap(valueMap[key])
+        ByteBuffer.wrap(Longs.toByteArray(newValue.toLong()))
       )
       event.reply(response)
     }

@@ -39,7 +39,6 @@ kt_jvm_binary(
         "utils/Validators.kt",
     ],
     jvm_flags = [
-        "-Xlog:gc*",
         "-Xms1G",
         "-Xmx4G",
         "-XX:+UseZGC",
