@@ -1,41 +1,51 @@
 package app.server
 
 import app.handler.Router
+import com.lmax.disruptor.InsufficientCapacityException
+import com.lmax.disruptor.Sequence
+import com.lmax.disruptor.Sequencer
+import com.lmax.disruptor.dsl.Disruptor
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
 import java.nio.channels.spi.SelectorProvider
-import java.util.concurrent.LinkedTransferQueue
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 
 class SelectorThread(
   threadName: String,
   private val server: Server,
-  private val router: Router
+  private val router: Router,
+  private val disruptor: Disruptor<Container<Any>>
 ): Thread(threadName) {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(SelectorThread::class.java)
   }
+  private val ringBuffer = disruptor.ringBuffer
+  private val sequence = Sequence(Sequencer.INITIAL_CURSOR_VALUE)
   private val selector = SelectorProvider.provider().openSelector()
-  private val acceptedConnectionQueue = AtomicReference(LinkedTransferQueue<SocketChannel>())
-  private val selectInterestChangesQueue = AtomicReference(LinkedTransferQueue<Message>())
   private val isRunning: AtomicBoolean = AtomicBoolean(true)
+  init {
+    ringBuffer.addGatingSequences(sequence)
+  }
 
   fun addAcceptedConnection(channel: SocketChannel): Boolean {
-    val result = acceptedConnectionQueue.get().offer(channel)
-    selector.wakeup()
-    return result
+    if (publishToRingBuffer(channel)) {
+      selector.wakeup()
+      return true
+    }
+    return false
   }
 
   override fun run() {
+    if (!disruptor.hasStarted()) {
+      disruptor.start()
+    }
     try {
       while (isRunning.get()) {
         select()
-        setupAcceptedConnection()
-        changeInterestOpsSession()
+        processQueuedEvent()
       }
     } catch (e: IOException) {
       LOG.error("Selector Thread crashed due to an unexpected error", e)
@@ -50,6 +60,9 @@ class SelectorThread(
     } catch (e: IOException) {
       LOG.error("Error closing selector", e)
     }
+    if (disruptor.hasStarted()) {
+      disruptor.shutdown()
+    }
     server.stop()
   }
 
@@ -60,13 +73,26 @@ class SelectorThread(
   fun stopRunning() {
     wakeup()
     isRunning.set(false)
+    if (!disruptor.hasStarted()) {
+      disruptor.shutdown()
+    }
   }
 
-  private fun setupAcceptedConnection() {
-    val currentInQueue = acceptedConnectionQueue.getAndSet(LinkedTransferQueue<SocketChannel>())
-    while (currentInQueue.isNotEmpty()) {
-      registerAcceptedConnection(currentInQueue.poll())
+  private fun processQueuedEvent() {
+    val availableSequence = ringBuffer.cursor
+    if (availableSequence <= sequence.get()) {
+      return
     }
+    for (i in (sequence.get() + 1)..availableSequence) {
+      val container = ringBuffer[i]
+      val value = container.value ?: continue
+      when (value) {
+        is SocketChannel -> registerAcceptedConnection(value)
+        is Message -> value.requestInterestChange()
+      }
+    }
+
+    sequence.set(availableSequence)
   }
 
   private fun registerAcceptedConnection(channel: SocketChannel) {
@@ -85,17 +111,21 @@ class SelectorThread(
   }
 
   fun requestInterestChange(message: Message) {
-    if (selectInterestChangesQueue.get().add(message)) {
+    if (publishToRingBuffer(message)) {
       selector.wakeup()
     }
   }
 
-  private fun changeInterestOpsSession() {
-    val currentInQueue = selectInterestChangesQueue.getAndSet(LinkedTransferQueue<Message>())
-    while (currentInQueue.isNotEmpty()) {
-      val message = currentInQueue.poll()
-      message.requestInterestChange()
+  private fun publishToRingBuffer(value: Any): Boolean {
+    val next = try {
+      ringBuffer.tryNext()
+    } catch (_: InsufficientCapacityException) {
+      return false
     }
+    val container = ringBuffer[next]
+    container.value = value
+    ringBuffer.publish(next)
+    return true
   }
 
   private fun cleanUpSelectionKey(selectionKey: SelectionKey) {

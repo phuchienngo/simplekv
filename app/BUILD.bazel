@@ -31,6 +31,7 @@ kt_jvm_binary(
         "handler/Router.kt",
         "handler/Worker.kt",
         "server/AcceptorThread.kt",
+        "server/Container.kt",
         "server/Message.kt",
         "server/SelectorThread.kt",
         "server/Server.kt",
