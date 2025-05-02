@@ -40,7 +40,6 @@ class Message(
         buffer.flip()
         header = parseHeader(buffer)
         if (!header.isMagicRequest()) {
-          state = State.AWAITING_CLOSE
           LOG.error("Invalid magic number in request: {}", header.magic)
           return false
         }
@@ -131,7 +130,7 @@ class Message(
         }
         State.AWAITING_REGISTER_READ -> prepareRead()
         State.AWAITING_CLOSE -> close()
-        else -> LOG.error("[changeSelectInterests] Unexpected state: {}", state)
+        else -> {}
       }
     } catch (e: Exception) {
       LOG.error("Error changing select interests", e)

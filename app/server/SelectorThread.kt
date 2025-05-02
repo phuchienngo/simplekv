@@ -180,7 +180,6 @@ class SelectorThread(
     val message = selectionKey.attachment() as Message
     if (!message.write()) {
       cleanUpSelectionKey(selectionKey)
-      return
     }
   }
 }

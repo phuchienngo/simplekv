@@ -67,7 +67,7 @@ class AcceptorThread: Thread {
         }
       }
     } catch (e: IOException) {
-      LOG.warn("Encountered an error while selecting!", e);
+      LOG.warn("Encountered an error while selecting!", e)
     }
   }
 

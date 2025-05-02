@@ -59,18 +59,23 @@ object MainApp {
     val threadFactory = ThreadFactoryBuilder()
       .setNameFormat("$serverName-worker-%d")
       .build()
+    val producerType = if (workerNum == 1) {
+      ProducerType.SINGLE
+    } else {
+      ProducerType.MULTI
+    }
     val workers = (0 until workerNum).map {
-      return@map createWorker(threadFactory)
+      return@map createWorker(threadFactory, producerType)
     }
     return Router(workers, hashFunction)
   }
 
-  private fun createWorker(threadFactory: ThreadFactory): Worker {
+  private fun createWorker(threadFactory: ThreadFactory, producerType: ProducerType): Worker {
     val disruptor = Disruptor(
       Event.FACTORY,
       1024,
       threadFactory,
-      ProducerType.MULTI,
+      producerType,
       YieldingWaitStrategy()
     )
     val worker = Worker(disruptor)
