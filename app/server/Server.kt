@@ -67,7 +67,7 @@ class Server(
     return Disruptor(
       Container.FACTORY,
       1024,
-      { r: Runnable -> Thread(r, "disruptor") },
+      null,
       ProducerType.MULTI,
       YieldingWaitStrategy()
     )
