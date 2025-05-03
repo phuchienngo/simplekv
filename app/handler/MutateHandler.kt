@@ -6,6 +6,7 @@ import app.core.ErrorCode
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
+import java.nio.ByteBuffer
 
 interface MutateHandler: BaseHandler {
   fun processMutateCommand(event: Event, command: CommandOpCodes) {
@@ -23,7 +24,7 @@ interface MutateHandler: BaseHandler {
       return
     }
     val extras = event.body.extras
-    val value = event.body.value ?: ByteArray(0)
+    val value = event.body.value ?: ByteBuffer.allocate(0)
     val now = System.currentTimeMillis()
 
     when (command) {
@@ -50,9 +51,9 @@ interface MutateHandler: BaseHandler {
     }
   }
 
-  private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteArray?, extras: ByteArray?, cas: Long) {
-    valueMap[key] = value
-    extrasMap[key] = extras
+  private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteBuffer?, extras: ByteBuffer?, cas: Long) {
+    valueMap[key] = value?.duplicate()
+    extrasMap[key] = extras?.duplicate()
     casMap[key] = cas
     if (Commands.isQuietCommand(command)) {
       event.done()

@@ -12,21 +12,23 @@ object Validators {
   fun hasExtras(event: Event): Boolean {
     return event.header.extrasLength > BYTE_ZERO
         && event.body.extras != null
-        && event.header.extrasLength.toInt() == event.body.extras?.size
+        && event.header.extrasLength.toInt() == event.body.extras?.limit()
   }
 
   fun hasKey(event: Event): Boolean {
     if (event.header.keyLength <= SHORT_ZERO
       || event.header.keyLength > SHORT_250
       || event.body.key == null
-      || event.body.key?.size != event.header.keyLength.toInt()) {
+      || event.body.key?.limit() != event.header.keyLength.toInt()) {
       return false
     }
     val buffer = event.body.key
     if (buffer == null) {
       return false
     }
-    for (b in event.body.key!!) {
+    val duplicated = event.body.key!!.duplicate()
+    while (duplicated.position() < duplicated.limit()) {
+      val b = duplicated.get()
       if (b <= BYTE_32 || b == BYTE_127) {
         return false
       }
@@ -37,6 +39,6 @@ object Validators {
   fun hasValue(event: Event): Boolean {
     return event.header.valueLength > 0
         && event.body.value != null
-        && event.body.value?.size == event.header.valueLength
+        && event.body.value?.limit() == event.header.valueLength
   }
 }

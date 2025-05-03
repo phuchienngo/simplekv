@@ -3,8 +3,8 @@ package app.handler
 import app.core.CommandOpCodes
 import app.core.Event
 import app.datastructure.SwissMap
-import app.utils.Commands
 import com.lmax.disruptor.dsl.Disruptor
+import java.nio.ByteBuffer
 
 class Worker(
   disruptor: Disruptor<Event>
@@ -14,8 +14,8 @@ class Worker(
   DeleteHandler,
   IncrementDecrementHandler,
   AppendPrependHandler {
-  override val valueMap = SwissMap<String, ByteArray>()
-  override val extrasMap = SwissMap<String, ByteArray>()
+  override val valueMap = SwissMap<String, ByteBuffer>()
+  override val extrasMap = SwissMap<String, ByteBuffer>()
   override val casMap = SwissMap<String, Long>()
 
   override fun process(event: Event) {

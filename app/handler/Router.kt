@@ -6,7 +6,7 @@ import app.server.Message
 import app.utils.Responses
 import com.google.common.hash.HashFunction
 import com.google.common.hash.Hashing
-import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
 
 class Router(
@@ -14,6 +14,7 @@ class Router(
   private val hashFunction: HashFunction
 ) {
   private val isStarted = AtomicBoolean(false)
+  private val version = StandardCharsets.US_ASCII.encode("1.0.0")
 
   fun start() {
     if (!isStarted.compareAndSet(false, true)) {
@@ -49,8 +50,8 @@ class Router(
         message.reply(response)
       }
       CommandOpCodes.VERSION.value -> {
-        val version = ByteBuffer.wrap("1.0.0".toByteArray())
-        val response = Responses.makeResponse(message.header, 0, null, null, version)
+        val buffer = version.duplicate()
+        val response = Responses.makeResponse(message.header, 0, null, null, buffer)
         message.reply(response)
       }
       CommandOpCodes.QUIT.value,
@@ -69,7 +70,7 @@ class Router(
   }
 
   private fun handleRequest(message: Message) {
-    val key = message.body.key!!
+    val key = message.body.key!!.duplicate()
     val hash = hashFunction.hashBytes(key)
     val workerIndex = Hashing.consistentHash(hash, workers.size)
 

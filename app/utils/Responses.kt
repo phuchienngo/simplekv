@@ -7,8 +7,8 @@ import java.nio.charset.StandardCharsets
 
 object Responses {
   fun makeError(header: Header, error: ErrorCode): ByteBuffer {
-    val errorMessage = error.description.toByteArray(StandardCharsets.US_ASCII)
-    val errorLength = errorMessage.size
+    val errorMessage = StandardCharsets.US_ASCII.encode(error.description)
+    val errorLength = errorMessage.limit()
     val responseBuffer = ByteBuffer.allocate(24 + errorLength)
     responseBuffer.put(0x81.toByte()) // magic
     responseBuffer.put(0) // opcode
@@ -25,9 +25,9 @@ object Responses {
   }
 
   fun makeResponse(header: Header, cas: Long, extras: ByteBuffer?, key: ByteBuffer?, value: ByteBuffer?): ByteBuffer {
-    val extrasLength = extras?.capacity() ?: 0
-    val keyLength = key?.capacity() ?: 0
-    val valueLength = value?.capacity() ?: 0
+    val extrasLength = extras?.limit() ?: 0
+    val keyLength = key?.limit() ?: 0
+    val valueLength = value?.limit() ?: 0
     val totalBodyLength = extrasLength + keyLength + valueLength
     val responseBuffer = ByteBuffer.allocate(24 + totalBodyLength)
     responseBuffer.put(0x81.toByte()) // magic

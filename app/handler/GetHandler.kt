@@ -33,13 +33,17 @@ interface GetHandler: BaseHandler {
     val response = Responses.makeResponse(
       event.header,
       cas,
-      extras?.let(ByteBuffer::wrap),
-      if (command == CommandOpCodes.GETK || command == CommandOpCodes.GETKQ) {
-        event.body.key?.let(ByteBuffer::wrap)
+      extras?.duplicate(),
+      if (command == CommandOpCodes.GETK) {
+        event.body.key?.duplicate()
       } else {
         null
       },
-      value?.let(ByteBuffer::wrap)
+      if (command == CommandOpCodes.GET || command == CommandOpCodes.GETK) {
+        value?.duplicate()
+      } else {
+        null
+      }
     )
     event.reply(response)
   }

@@ -1,11 +1,12 @@
 package app.handler
 
 import app.core.CommandOpCodes
-import app.core.Event
 import app.core.ErrorCode
+import app.core.Event
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
+import java.nio.ByteBuffer
 
 interface AppendPrependHandler: BaseHandler {
   @Suppress("DuplicatedCode")
@@ -37,9 +38,9 @@ interface AppendPrependHandler: BaseHandler {
     val existingValue = valueMap[key]!!
     val newValue = when (command) {
       CommandOpCodes.APPEND,
-      CommandOpCodes.APPENDQ -> existingValue + event.body.value!!
+      CommandOpCodes.APPENDQ -> concat(existingValue, event.body.value!!)
       CommandOpCodes.PREPEND,
-      CommandOpCodes.PREPENDQ -> event.body.value!! + existingValue
+      CommandOpCodes.PREPENDQ -> concat(event.body.value!!, existingValue)
       else -> existingValue // This case should never happen
     }
 
@@ -59,5 +60,13 @@ interface AppendPrependHandler: BaseHandler {
       null
     )
     event.reply(response)
+  }
+
+  private fun concat(b1: ByteBuffer, b2: ByteBuffer): ByteBuffer {
+    val result: ByteBuffer = ByteBuffer.allocate(b1.remaining() + b2.remaining())
+    result.put(b1.duplicate())
+    result.put(b2.duplicate())
+    result.flip()
+    return result
   }
 }

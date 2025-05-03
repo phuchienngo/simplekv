@@ -8,6 +8,7 @@ import app.utils.Responses
 import app.utils.Validators
 import com.google.common.primitives.Longs
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 interface IncrementDecrementHandler: BaseHandler {
   fun processIncrementDecrementCommand(event: Event, command: CommandOpCodes) {
@@ -17,7 +18,7 @@ interface IncrementDecrementHandler: BaseHandler {
       return
     }
 
-    val extras = ByteBuffer.wrap(event.message.body.extras!!)
+    val extras = event.message.body.extras!!
     val delta = extras.getLong().toULong()
     val initialValue = extras.getLong().toULong()
     val expiration = extras.getInt()
@@ -53,9 +54,12 @@ interface IncrementDecrementHandler: BaseHandler {
     applyAndResponse(key, newValue, now, event, command)
   }
 
-  private fun parseStringValue(buffer: ByteArray): ULong {
+  private fun parseStringValue(buffer: ByteBuffer): ULong {
     try {
-      val value = String(buffer, Charsets.US_ASCII)
+      val value = StandardCharsets
+        .US_ASCII
+        .decode(buffer.duplicate())
+        .toString()
       if (isAllNumber(value)) {
         return value.toULong()
       }
@@ -77,14 +81,16 @@ interface IncrementDecrementHandler: BaseHandler {
         cas,
         null,
         null,
-        ByteBuffer.wrap(Longs.toByteArray(newValue.toLong()))
+        ByteBuffer.allocate(8)
+          .putLong(newValue.toLong())
+          .flip()
       )
       event.reply(response)
     }
   }
 
-  private fun createCounterValueBuffer(value: ULong): ByteArray {
-    return "$value".toByteArray(Charsets.US_ASCII)
+  private fun createCounterValueBuffer(value: ULong): ByteBuffer {
+    return StandardCharsets.US_ASCII.encode("$value")
   }
 
   private fun isAllNumber(value: String): Boolean {

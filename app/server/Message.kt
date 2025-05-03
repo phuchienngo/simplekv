@@ -71,16 +71,11 @@ class Message(
     return true
   }
 
-  private fun slice(buffer: ByteBuffer, offset: Int, length: Int): ByteArray? {
-    if (offset < 0 || length <= 0) {
+  private fun slice(buffer: ByteBuffer, index: Int, length: Int): ByteBuffer? {
+    if (index < 0 || length <= 0) {
       return null
     }
-
-    val dst = ByteArray(length)
-    buffer.position(offset)
-    buffer.get(dst, 0, length)
-    buffer.position(0)
-    return dst
+    return buffer.slice(index, length)
   }
 
   @JvmSynthetic
