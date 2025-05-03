@@ -15,10 +15,6 @@ data class Header(
     return (magic.toInt() and 0xFF) == 0x80
   }
 
-  fun isMagicResponse(): Boolean {
-    return (magic.toInt() and 0xFF) == 0x81
-  }
-
   val valueLength: Int
     get() = totalBodyLength - keyLength - extrasLength
 }

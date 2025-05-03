@@ -1,9 +1,6 @@
 package app.server
 
 import app.handler.Router
-import com.lmax.disruptor.YieldingWaitStrategy
-import com.lmax.disruptor.dsl.Disruptor
-import com.lmax.disruptor.dsl.ProducerType
 import java.io.IOException
 import java.net.SocketAddress
 import java.nio.channels.ServerSocketChannel
@@ -26,8 +23,7 @@ class Server(
       return@map SelectorThread(
         "$serverName-selector-$index",
         this,
-        router,
-        createDisruptor()
+        router
       )
     }
     acceptor = AcceptorThread("$serverName-acceptor", this, serverChannel, selectors)
@@ -61,15 +57,5 @@ class Server(
       selectorThread.interrupt()
     }
     acceptor.interrupt()
-  }
-
-  private fun createDisruptor(): Disruptor<Container<Any>> {
-    return Disruptor(
-      Container.FACTORY,
-      1024,
-      null,
-      ProducerType.SINGLE,
-      YieldingWaitStrategy()
-    )
   }
 }

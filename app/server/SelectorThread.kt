@@ -4,7 +4,9 @@ import app.handler.Router
 import com.lmax.disruptor.InsufficientCapacityException
 import com.lmax.disruptor.Sequence
 import com.lmax.disruptor.Sequencer
+import com.lmax.disruptor.YieldingWaitStrategy
 import com.lmax.disruptor.dsl.Disruptor
+import com.lmax.disruptor.dsl.ProducerType
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -17,11 +19,11 @@ class SelectorThread(
   threadName: String,
   private val server: Server,
   private val router: Router,
-  private val disruptor: Disruptor<Container<Any>>
 ): Thread(threadName) {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(SelectorThread::class.java)
   }
+  private val disruptor = createDisruptor()
   private val ringBuffer = disruptor.ringBuffer
   private val sequence = Sequence(Sequencer.INITIAL_CURSOR_VALUE)
   private val selector = SelectorProvider.provider().openSelector()
@@ -181,5 +183,15 @@ class SelectorThread(
     if (!message.write()) {
       cleanUpSelectionKey(selectionKey)
     }
+  }
+
+  private fun createDisruptor(): Disruptor<Container<Any>> {
+    return Disruptor(
+      Container.FACTORY,
+      1024,
+      null,
+      ProducerType.SINGLE,
+      YieldingWaitStrategy()
+    )
   }
 }

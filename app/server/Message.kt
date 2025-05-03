@@ -19,7 +19,7 @@ class Message(
   }
 
   private var state = State.READING_HEADER
-  private var buffer: ByteBuffer = ByteBuffer.allocate(24)
+  private var buffer: ByteBuffer = ByteBuffer.allocateDirect(24)
   lateinit var header: Header
   lateinit var body: Body
   private lateinit var responseBuffer: ByteBuffer
@@ -43,7 +43,7 @@ class Message(
           LOG.error("Invalid magic number in request: {}", header.magic)
           return false
         }
-        buffer = ByteBuffer.allocate(header.totalBodyLength)
+        buffer = ByteBuffer.allocateDirect(header.totalBodyLength)
         state = State.READING_BODY
       }
     }
@@ -82,14 +82,19 @@ class Message(
   internal fun write(): Boolean {
     if (state == State.WRITING) {
       try {
-        channelSocket.write(responseBuffer)
+        while (responseBuffer.hasRemaining()) {
+          val bytesWritten = channelSocket.write(responseBuffer)
+          if (bytesWritten == 0) {
+            return true
+          }
+          if (bytesWritten < 0) {
+            return false
+          }
+        }
+        prepareRead()
       } catch (e: IOException) {
         LOG.error("Error writing to channel", e)
         return false
-      }
-
-      if (!responseBuffer.hasRemaining()) {
-        prepareRead()
       }
     }
 
@@ -148,7 +153,7 @@ class Message(
 
   private fun prepareRead() {
     selectionKey.interestOps(SelectionKey.OP_READ)
-    buffer = ByteBuffer.allocate(24)
+    buffer = ByteBuffer.allocateDirect(24)
     state = State.READING_HEADER
   }
 
@@ -168,7 +173,13 @@ class Message(
 
   private fun internalRead(): Boolean {
     try {
-      return channelSocket.read(buffer) >= 0
+      var totalBytesRead = 0
+      var bytesRead: Int
+      do {
+        bytesRead = channelSocket.read(buffer)
+        totalBytesRead += 0.coerceAtLeast(bytesRead)
+      } while (bytesRead > 0 && buffer.hasRemaining())
+      return totalBytesRead >= 0 || bytesRead >= 0
     } catch (e: IOException) {
       LOG.error("Encountered error while reading from channel", e)
       return false

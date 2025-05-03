@@ -6,7 +6,6 @@ import app.core.ErrorCode
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
-import java.nio.ByteBuffer
 
 interface GetHandler: BaseHandler {
   fun processGetCommand(event: Event, command: CommandOpCodes) {
