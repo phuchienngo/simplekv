@@ -19,7 +19,7 @@ class Message(
   }
 
   private var state = State.READING_HEADER
-  private var buffer: ByteBuffer = ByteBuffer.allocateDirect(24)
+  private var buffer: ByteBuffer = selectorThread.borrowHeaderBuffer()
   lateinit var header: Header
   lateinit var body: Body
   private lateinit var responseBuffer: ByteBuffer
@@ -39,6 +39,7 @@ class Message(
       if (!buffer.hasRemaining()) {
         buffer.flip()
         header = parseHeader(buffer)
+        selectorThread.returnHeaderBuffer(buffer)
         if (!header.isMagicRequest()) {
           LOG.error("Invalid magic number in request: {}", header.magic)
           return false
@@ -153,7 +154,7 @@ class Message(
 
   private fun prepareRead() {
     selectionKey.interestOps(SelectionKey.OP_READ)
-    buffer = ByteBuffer.allocateDirect(24)
+    buffer = selectorThread.borrowHeaderBuffer()
     state = State.READING_HEADER
   }
 

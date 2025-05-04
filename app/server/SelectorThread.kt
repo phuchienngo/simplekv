@@ -1,18 +1,23 @@
 package app.server
 
 import app.handler.Router
+import app.utils.ByteBufferPoolFactory
 import com.lmax.disruptor.InsufficientCapacityException
 import com.lmax.disruptor.Sequence
 import com.lmax.disruptor.Sequencer
 import com.lmax.disruptor.YieldingWaitStrategy
 import com.lmax.disruptor.dsl.Disruptor
 import com.lmax.disruptor.dsl.ProducerType
+import org.apache.commons.pool2.impl.GenericObjectPool
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
 import java.nio.channels.spi.SelectorProvider
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
 
 class SelectorThread(
@@ -28,6 +33,8 @@ class SelectorThread(
   private val sequence = Sequence(Sequencer.INITIAL_CURSOR_VALUE)
   private val selector = SelectorProvider.provider().openSelector()
   private val isRunning: AtomicBoolean = AtomicBoolean(true)
+  private val headerPool = initHeaderPoolObject()
+
   init {
     ringBuffer.addGatingSequences(sequence)
   }
@@ -38,6 +45,15 @@ class SelectorThread(
       return true
     }
     return false
+  }
+
+  fun borrowHeaderBuffer(): ByteBuffer {
+    return headerPool.borrowObject().clear()
+  }
+
+  fun returnHeaderBuffer(buffer: ByteBuffer) {
+    buffer.clear()
+    headerPool.returnObject(buffer)
   }
 
   override fun run() {
@@ -193,5 +209,17 @@ class SelectorThread(
       ProducerType.SINGLE,
       YieldingWaitStrategy()
     )
+  }
+
+  private fun initHeaderPoolObject(): GenericObjectPool<ByteBuffer> {
+    val poolConfig = GenericObjectPoolConfig<ByteBuffer>()
+    poolConfig.maxTotal = 100
+    poolConfig.minIdle = 16
+    poolConfig.testOnBorrow = true
+    poolConfig.testOnReturn = true
+    poolConfig.blockWhenExhausted = false
+    poolConfig.setMaxWait(Duration.ofSeconds(-1))
+    poolConfig.maxTotal = -1
+    return GenericObjectPool(ByteBufferPoolFactory(24, true), poolConfig)
   }
 }
