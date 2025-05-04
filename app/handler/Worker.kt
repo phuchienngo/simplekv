@@ -14,9 +14,9 @@ class Worker(
   DeleteHandler,
   IncrementDecrementHandler,
   AppendPrependHandler {
-  override val valueMap = SwissMap<String, ByteBuffer>()
-  override val extrasMap = SwissMap<String, ByteBuffer>()
-  override val casMap = SwissMap<String, Long>()
+  override val valueMap = SwissMap<String, ByteBuffer>(10_000_000, 0.75f)
+  override val extrasMap = SwissMap<String, ByteBuffer>(10_000_000, 0.75f)
+  override val casMap = SwissMap<String, Long>(10_000_000, 0.75f)
 
   override fun process(event: Event) {
     when (event.header.opcode) {
