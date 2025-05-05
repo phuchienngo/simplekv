@@ -130,7 +130,7 @@ class Message(
         }
         State.AWAITING_REGISTER_READ -> prepareRead()
         State.AWAITING_CLOSE -> close()
-        else -> {}
+        else -> LOG.warn("Unexpected state [{}] in changeSelectInterests!", state)
       }
     } catch (e: Exception) {
       LOG.error("Error changing select interests", e)

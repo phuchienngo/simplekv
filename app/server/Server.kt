@@ -2,13 +2,12 @@ package app.server
 
 import app.config.Config
 import app.handler.Router
-import java.net.SocketAddress
+import java.net.InetSocketAddress
 import java.nio.channels.ServerSocketChannel
 import java.util.concurrent.atomic.AtomicBoolean
 
 class Server(
-  config: Config,
-  private val bindingAddress: SocketAddress,
+  private val config: Config,
   private val router: Router,
 ) {
   private val isRunning = AtomicBoolean(false)
@@ -20,13 +19,13 @@ class Server(
     serverChannel.configureBlocking(false)
     selectors = (0 until config.selectorNum).map { index ->
       return@map SelectorThread(
-        "${config.serverName}-selector-$index",
-        config.selectorNum == 1,
+        config,
         this,
-        router
+        router,
+        index
       )
     }
-    acceptor = AcceptorThread("${config.serverName}-acceptor", this, serverChannel, selectors)
+    acceptor = AcceptorThread(config, this, serverChannel, selectors)
   }
 
   fun start() {
@@ -34,6 +33,7 @@ class Server(
       return
     }
     router.start()
+    val bindingAddress = InetSocketAddress(config.port)
     serverChannel.socket().bind(bindingAddress)
     for (selectorThread in selectors) {
       selectorThread.start()

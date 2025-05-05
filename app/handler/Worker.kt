@@ -1,11 +1,12 @@
 package app.handler
 
+import app.config.Config
 import app.core.CommandOpCodes
 import app.core.Event
 import app.datastructure.SwissMap
 import java.nio.ByteBuffer
 
-class Worker(workerName: String, isSingleProducer: Boolean): AbstractWorker(workerName, isSingleProducer),
+class Worker(config: Config, index: Int): AbstractWorker(config, index),
   GetHandler,
   MutateHandler,
   DeleteHandler,

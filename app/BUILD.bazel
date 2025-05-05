@@ -25,7 +25,6 @@ kt_jvm_binary(
         "handler/BaseHandler.kt",
         "handler/DeleteHandler.kt",
         "handler/GetHandler.kt",
-        "handler/GlobalExceptionHandler.kt",
         "handler/IncrementDecrementHandler.kt",
         "handler/MutateHandler.kt",
         "handler/Router.kt",

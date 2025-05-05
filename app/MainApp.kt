@@ -9,7 +9,6 @@ import org.apache.commons.cli.Option
 import org.apache.commons.cli.Options
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.net.InetSocketAddress
 
 
 object MainApp {
@@ -29,11 +28,7 @@ object MainApp {
     val hashFunction = Hashing.crc32c()
     val router = Router(config, hashFunction)
     LOG.info("Setting up {} selector(s)", selectorNum)
-    val server = Server(
-      config,
-      InetSocketAddress(port),
-      router
-    )
+    val server = Server(config, router)
 
     LOG.info("Starting server on {}", port)
     server.start()
@@ -91,7 +86,7 @@ object MainApp {
       val parser = DefaultParser()
       val cmd = parser.parse(options, args)
       val port = cmd.getOptionValue("p").toInt()
-      val serverName = cmd.getOptionValue("n")
+      val appName = cmd.getOptionValue("n")
       val workerNum = cmd.getOptionValue("w").toInt()
       val selectorNum = cmd.getOptionValue("s").toInt()
       if (port < 0 || port > 65535) {
@@ -100,14 +95,14 @@ object MainApp {
       if (workerNum <= 0) {
         throw IllegalArgumentException("Worker number must be greater than 0")
       }
-      if (serverName.isBlank()) {
+      if (appName.isBlank()) {
         throw IllegalArgumentException("Server name cannot be empty")
       }
       if (selectorNum <= 0) {
         throw IllegalArgumentException("Selector number must be greater than 0")
       }
       val config = Config(
-        serverName = serverName,
+        appName = appName,
         port = port,
         workerNum = workerNum,
         selectorNum = selectorNum

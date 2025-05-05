@@ -1,5 +1,6 @@
 package app.server
 
+import app.config.Config
 import app.handler.Router
 import app.utils.ByteBufferPoolFactory
 import com.lmax.disruptor.RingBuffer
@@ -17,22 +18,18 @@ import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
 
 class SelectorThread(
-  threadName: String,
-  isSingleProducer: Boolean,
+  config: Config,
   private val server: Server,
   private val router: Router,
-): Thread(threadName) {
+  index: Int,
+): Thread("${config.appName}-SelectorThread-$index") {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(SelectorThread::class.java)
   }
-  private val ringBuffer = if (isSingleProducer) {
-    RingBuffer.createSingleProducer(Container.FACTORY, 1024)
-  } else {
-    RingBuffer.createMultiProducer(Container.FACTORY, 1024)
-  }
+  private val ringBuffer = initRingBuffer()
   private val sequence = Sequence(Sequencer.INITIAL_CURSOR_VALUE)
   private val selector = SelectorProvider.provider().openSelector()
-  private val isRunning: AtomicBoolean = AtomicBoolean(true)
+  private val isRunning: AtomicBoolean = AtomicBoolean(false)
   private val headerPool = initHeaderPoolObject()
 
   init {
@@ -62,6 +59,9 @@ class SelectorThread(
   }
 
   override fun run() {
+    if (!isRunning.compareAndSet(false, true)) {
+      return
+    }
     try {
       while (isRunning.get()) {
         val isSelected = select()
@@ -141,7 +141,10 @@ class SelectorThread(
   private fun cleanUpSelectionKey(selectionKey: SelectionKey) {
     try {
       val attachment = selectionKey.attachment() as? Message
-      attachment?.close() ?: return
+      if (attachment != null) {
+        attachment.close()
+        return
+      }
       selectionKey.cancel()
       selectionKey.channel().close()
     } catch (e: Exception) {
@@ -206,5 +209,9 @@ class SelectorThread(
     poolConfig.setMaxWait(Duration.ofSeconds(-1))
     poolConfig.maxTotal = -1
     return GenericObjectPool(ByteBufferPoolFactory(24, true), poolConfig)
+  }
+
+  private fun initRingBuffer(): RingBuffer<Container<Any>> {
+    return RingBuffer.createMultiProducer(Container.FACTORY, 1024)
   }
 }

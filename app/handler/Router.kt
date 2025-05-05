@@ -80,10 +80,8 @@ class Router(
   }
 
   private fun initWorker(config: Config): List<Worker> {
-    val isSingleProducer = config.selectorNum == 1
-    val workers = (0 until config.workerNum).map { index ->
-      return@map Worker("${config.serverName}-worker-$index", isSingleProducer)
+    return (0 until config.workerNum).map { index ->
+      return@map Worker(config, index)
     }
-    return workers
   }
 }

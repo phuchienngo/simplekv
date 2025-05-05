@@ -1,5 +1,6 @@
 package app.handler
 
+import app.config.Config
 import app.core.ErrorCode
 import app.core.Event
 import app.server.Message
@@ -12,17 +13,13 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicBoolean
 
 abstract class AbstractWorker(
-  workerName: String,
-  isSingleProducer: Boolean
-): Thread(workerName) {
+  private val config: Config,
+  index: Int
+): Thread("${config.appName}-Worker-$index") {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(AbstractWorker::class.java)
   }
-  private val ringBuffer = if (isSingleProducer) {
-    RingBuffer.createSingleProducer(Event.FACTORY, 1024)
-  } else {
-    RingBuffer.createMultiProducer(Event.FACTORY, 1024)
-  }
+  private val ringBuffer = initRingBuffer()
   private val sequence = Sequence(Sequencer.INITIAL_CURSOR_VALUE)
   private val isRunning: AtomicBoolean = AtomicBoolean(false)
 
@@ -33,7 +30,9 @@ abstract class AbstractWorker(
   abstract fun process(event: Event)
 
   override fun run() {
-    isRunning.set(true)
+    if (!isRunning.compareAndSet(false, true)) {
+      return
+    }
     while (isRunning.get()) {
       if (processQueuedEvent()) {
         continue
@@ -72,5 +71,13 @@ abstract class AbstractWorker(
     }
     sequence.set(current)
     return prev < current
+  }
+
+  private fun initRingBuffer(): RingBuffer<Event> {
+    return if (config.selectorNum == 1) {
+      RingBuffer.createSingleProducer(Event.FACTORY, 1024)
+    } else {
+      RingBuffer.createMultiProducer(Event.FACTORY, 1024)
+    }
   }
 }

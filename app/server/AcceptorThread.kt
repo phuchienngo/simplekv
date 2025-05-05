@@ -1,5 +1,6 @@
 package app.server
 
+import app.config.Config
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.channels.SelectionKey
@@ -20,17 +21,20 @@ class AcceptorThread: Thread {
   private val isRunning: AtomicBoolean
   private val increment: AtomicLong
 
-  constructor(threadName: String, server: Server, serverChannel: ServerSocketChannel, selectorThreads: List<SelectorThread>): super(threadName) {
+  constructor(config: Config, server: Server, serverChannel: ServerSocketChannel, selectorThreads: List<SelectorThread>): super("${config.appName}-AcceptorThread") {
     this.server = server
     this.serverChannel = serverChannel
     this.selectorThreads = selectorThreads
     acceptSelector = SelectorProvider.provider().openSelector()
-    isRunning = AtomicBoolean(true)
+    isRunning = AtomicBoolean(false)
     increment = AtomicLong(0)
     serverChannel.register(acceptSelector, SelectionKey.OP_ACCEPT)
   }
 
   override fun run() {
+    if (!isRunning.compareAndSet(false, true)) {
+      return
+    }
     while (isRunning.get()) {
       select()
     }
