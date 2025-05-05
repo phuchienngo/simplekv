@@ -1,5 +1,6 @@
 package app.handler
 
+import app.config.Config
 import app.core.CommandOpCodes
 import app.core.ErrorCode
 import app.server.Message
@@ -10,11 +11,12 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
 
 class Router(
-  private val workers: List<Worker>,
+  config: Config,
   private val hashFunction: HashFunction
 ) {
   private val isStarted = AtomicBoolean(false)
   private val version = StandardCharsets.US_ASCII.encode("1.0.0")
+  private val workers: List<Worker> = initWorker(config)
 
   fun start() {
     if (!isStarted.compareAndSet(false, true)) {
@@ -31,7 +33,7 @@ class Router(
       return
     }
     for (worker in workers) {
-      worker.stop()
+      worker.stopRunning()
     }
   }
 
@@ -75,5 +77,13 @@ class Router(
     val workerIndex = Hashing.consistentHash(hash, workers.size)
 
     workers[workerIndex].dispatch(message)
+  }
+
+  private fun initWorker(config: Config): List<Worker> {
+    val isSingleProducer = config.selectorNum == 1
+    val workers = (0 until config.workerNum).map { index ->
+      return@map Worker("${config.serverName}-worker-$index", isSingleProducer)
+    }
+    return workers
   }
 }

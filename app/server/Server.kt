@@ -1,15 +1,14 @@
 package app.server
 
+import app.config.Config
 import app.handler.Router
-import java.io.IOException
 import java.net.SocketAddress
 import java.nio.channels.ServerSocketChannel
 import java.util.concurrent.atomic.AtomicBoolean
 
 class Server(
-  serverName: String,
+  config: Config,
   private val bindingAddress: SocketAddress,
-  selectorNum: Int,
   private val router: Router,
 ) {
   private val isRunning = AtomicBoolean(false)
@@ -19,17 +18,17 @@ class Server(
 
   init {
     serverChannel.configureBlocking(false)
-    selectors = (0 until selectorNum).map { index ->
+    selectors = (0 until config.selectorNum).map { index ->
       return@map SelectorThread(
-        "$serverName-selector-$index",
+        "${config.serverName}-selector-$index",
+        config.selectorNum == 1,
         this,
         router
       )
     }
-    acceptor = AcceptorThread("$serverName-acceptor", this, serverChannel, selectors)
+    acceptor = AcceptorThread("${config.serverName}-acceptor", this, serverChannel, selectors)
   }
 
-  @Throws(IOException::class)
   fun start() {
     if (!isRunning.compareAndSet(false, true)) {
       return

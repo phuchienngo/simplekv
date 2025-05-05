@@ -4,7 +4,6 @@ import app.core.Body
 import app.core.Header
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
@@ -93,7 +92,7 @@ class Message(
           }
         }
         prepareRead()
-      } catch (e: IOException) {
+      } catch (e: Exception) {
         LOG.error("Error writing to channel", e)
         return false
       }
@@ -143,11 +142,12 @@ class Message(
     }
   }
 
-  private fun close() {
+  fun close() {
+    selectorThread.returnHeaderBuffer(buffer)
     selectionKey.cancel()
     try {
       channelSocket.close()
-    } catch (e: IOException) {
+    } catch (e: Exception) {
       LOG.error("Error closing channel", e)
     }
   }
@@ -181,7 +181,7 @@ class Message(
         totalBytesRead += 0.coerceAtLeast(bytesRead)
       } while (bytesRead > 0 && buffer.hasRemaining())
       return totalBytesRead >= 0 || bytesRead >= 0
-    } catch (e: IOException) {
+    } catch (e: Exception) {
       LOG.error("Encountered error while reading from channel", e)
       return false
     }

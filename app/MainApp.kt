@@ -1,24 +1,15 @@
 package app
 
 import app.config.Config
-import app.core.Event
-import app.handler.GlobalExceptionHandler
 import app.handler.Router
-import app.handler.Worker
 import app.server.Server
-import com.google.common.hash.HashFunction
 import com.google.common.hash.Hashing
-import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.lmax.disruptor.YieldingWaitStrategy
-import com.lmax.disruptor.dsl.Disruptor
-import com.lmax.disruptor.dsl.ProducerType
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.Option
 import org.apache.commons.cli.Options
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.net.InetSocketAddress
-import java.util.concurrent.ThreadFactory
 
 
 object MainApp {
@@ -31,16 +22,16 @@ object MainApp {
       LOG.error("Failed to parse command line arguments")
       return
     }
-    val (serverName, port, workerNum, selectorNum) = configResult.getOrNull()!!
+    val config = configResult.getOrNull()!!
+    val (_, port, workerNum, selectorNum) = config
     LOG.info("Application pid: {}", ProcessHandle.current().pid())
     LOG.info("Setting up {} worker(s)", workerNum)
     val hashFunction = Hashing.crc32c()
-    val router = setupRouter(serverName, workerNum, selectorNum, hashFunction)
+    val router = Router(config, hashFunction)
     LOG.info("Setting up {} selector(s)", selectorNum)
     val server = Server(
-      serverName,
+      config,
       InetSocketAddress(port),
-      selectorNum,
       router
     )
 
@@ -53,35 +44,6 @@ object MainApp {
       server.stop()
       LOG.info("Server is stopped")
     })
-  }
-
-  private fun setupRouter(serverName: String, workerNum: Int, selectorNum: Int, hashFunction: HashFunction): Router {
-    val threadFactory = ThreadFactoryBuilder()
-      .setNameFormat("$serverName-worker-%d")
-      .build()
-    val producerType = if (selectorNum == 1) {
-      ProducerType.SINGLE
-    } else {
-      ProducerType.MULTI
-    }
-    val workers = (0 until workerNum).map {
-      return@map createWorker(threadFactory, producerType)
-    }
-    return Router(workers, hashFunction)
-  }
-
-  private fun createWorker(threadFactory: ThreadFactory, producerType: ProducerType): Worker {
-    val disruptor = Disruptor(
-      Event.FACTORY,
-      1024,
-      threadFactory,
-      producerType,
-      YieldingWaitStrategy()
-    )
-    val worker = Worker(disruptor)
-    disruptor.handleEventsWith(worker)
-    disruptor.setDefaultExceptionHandler(GlobalExceptionHandler.INSTANCE)
-    return worker
   }
 
   private fun parseOption(args: Array<String>): Result<Config> {

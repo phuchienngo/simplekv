@@ -3,12 +3,9 @@ package app.handler
 import app.core.CommandOpCodes
 import app.core.Event
 import app.datastructure.SwissMap
-import com.lmax.disruptor.dsl.Disruptor
 import java.nio.ByteBuffer
 
-class Worker(
-  disruptor: Disruptor<Event>
-): AbstractWorker(disruptor),
+class Worker(workerName: String, isSingleProducer: Boolean): AbstractWorker(workerName, isSingleProducer),
   GetHandler,
   MutateHandler,
   DeleteHandler,

@@ -2,17 +2,13 @@ package app.server
 
 import app.handler.Router
 import app.utils.ByteBufferPoolFactory
-import com.lmax.disruptor.InsufficientCapacityException
+import com.lmax.disruptor.RingBuffer
 import com.lmax.disruptor.Sequence
 import com.lmax.disruptor.Sequencer
-import com.lmax.disruptor.YieldingWaitStrategy
-import com.lmax.disruptor.dsl.Disruptor
-import com.lmax.disruptor.dsl.ProducerType
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
@@ -22,14 +18,18 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class SelectorThread(
   threadName: String,
+  isSingleProducer: Boolean,
   private val server: Server,
   private val router: Router,
 ): Thread(threadName) {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(SelectorThread::class.java)
   }
-  private val disruptor = createDisruptor()
-  private val ringBuffer = disruptor.ringBuffer
+  private val ringBuffer = if (isSingleProducer) {
+    RingBuffer.createSingleProducer(Container.FACTORY, 1024)
+  } else {
+    RingBuffer.createMultiProducer(Container.FACTORY, 1024)
+  }
   private val sequence = Sequence(Sequencer.INITIAL_CURSOR_VALUE)
   private val selector = SelectorProvider.provider().openSelector()
   private val isRunning: AtomicBoolean = AtomicBoolean(true)
@@ -40,11 +40,16 @@ class SelectorThread(
   }
 
   fun addAcceptedConnection(channel: SocketChannel): Boolean {
-    if (publishToRingBuffer(channel)) {
-      selector.wakeup()
-      return true
+    val next = try {
+      ringBuffer.tryNext()
+    } catch (_: Exception) {
+      return false
     }
-    return false
+    val container = ringBuffer[next]
+    container.value = channel
+    ringBuffer.publish(next)
+    selector.wakeup()
+    return true
   }
 
   fun borrowHeaderBuffer(): ByteBuffer {
@@ -57,15 +62,16 @@ class SelectorThread(
   }
 
   override fun run() {
-    if (!disruptor.hasStarted()) {
-      disruptor.start()
-    }
     try {
       while (isRunning.get()) {
-        select()
-        processQueuedEvent()
+        val isSelected = select()
+        val isProcessed = processQueuedEvent()
+        if (isSelected || isProcessed) {
+          continue
+        }
+        yield()
       }
-    } catch (e: IOException) {
+    } catch (e: Exception) {
       LOG.error("Selector Thread crashed due to an unexpected error", e)
     }
 
@@ -75,11 +81,8 @@ class SelectorThread(
 
     try {
       selector.close()
-    } catch (e: IOException) {
+    } catch (e: Exception) {
       LOG.error("Error closing selector", e)
-    }
-    if (disruptor.hasStarted()) {
-      disruptor.shutdown()
     }
     server.stop()
   }
@@ -91,26 +94,25 @@ class SelectorThread(
   fun stopRunning() {
     wakeup()
     isRunning.set(false)
-    if (!disruptor.hasStarted()) {
-      disruptor.shutdown()
-    }
   }
 
-  private fun processQueuedEvent() {
+  private fun processQueuedEvent(): Boolean {
     val availableSequence = ringBuffer.cursor
     if (availableSequence <= sequence.get()) {
-      return
+      return false
     }
-    for (i in (sequence.get() + 1)..availableSequence) {
-      val container = ringBuffer[i]
+    val prev = sequence.get()
+    var current = prev
+    while (current + 1 <= availableSequence && ringBuffer.isAvailable(current + 1)) {
+      val container = ringBuffer[++current]
       val value = container.value ?: continue
       when (value) {
         is SocketChannel -> registerAcceptedConnection(value)
         is Message -> value.requestInterestChange()
       }
     }
-
-    sequence.set(availableSequence)
+    sequence.set(current)
+    return prev < current
   }
 
   private fun registerAcceptedConnection(channel: SocketChannel) {
@@ -119,7 +121,7 @@ class SelectorThread(
       selectionKey = channel.register(selector, SelectionKey.OP_READ)
       val message = Message(channel, selectionKey, this)
       selectionKey.attach(message)
-    } catch (e: IOException) {
+    } catch (e: Exception) {
       LOG.error("Failed to register accepted connection to selector", e)
       if (selectionKey != null) {
         cleanUpSelectionKey(selectionKey)
@@ -129,45 +131,37 @@ class SelectorThread(
   }
 
   fun requestInterestChange(message: Message) {
-    if (publishToRingBuffer(message)) {
-      selector.wakeup()
-    }
-  }
-
-  private fun publishToRingBuffer(value: Any): Boolean {
-    val next = try {
-      ringBuffer.tryNext()
-    } catch (_: InsufficientCapacityException) {
-      return false
-    }
+    val next = ringBuffer.next()
     val container = ringBuffer[next]
-    container.value = value
+    container.value = message
     ringBuffer.publish(next)
-    return true
+    selector.wakeup()
   }
 
   private fun cleanUpSelectionKey(selectionKey: SelectionKey) {
     try {
+      val attachment = selectionKey.attachment() as? Message
+      attachment?.close() ?: return
       selectionKey.cancel()
       selectionKey.channel().close()
-    } catch (e: IOException) {
+    } catch (e: Exception) {
       LOG.error("Error closing connection", e)
     }
   }
 
-  private fun select() {
+  private fun select(): Boolean {
     var iterator: MutableIterator<SelectionKey>
     try {
       val readyChannels = selector.selectNow()
       if (readyChannels == 0) {
-        return
+        return false
       }
 
       val selectedKeys = selector.selectedKeys()
       iterator = selectedKeys.iterator()
-    } catch (e: IOException) {
-      LOG.warn("Encountered an error while selecting!", e)
-      return
+    } catch (e: Exception) {
+      LOG.error("Encountered an error while selecting!", e)
+      return false
     }
 
     while (isRunning.get() && iterator.hasNext()) {
@@ -180,6 +174,7 @@ class SelectorThread(
         else -> LOG.warn("Unexpected state [{}] in select!", selectionKey.interestOps())
       }
     }
+    return true
   }
 
   private fun handleRead(selectionKey: SelectionKey) {
@@ -199,16 +194,6 @@ class SelectorThread(
     if (!message.write()) {
       cleanUpSelectionKey(selectionKey)
     }
-  }
-
-  private fun createDisruptor(): Disruptor<Container<Any>> {
-    return Disruptor(
-      Container.FACTORY,
-      1024,
-      null,
-      ProducerType.SINGLE,
-      YieldingWaitStrategy()
-    )
   }
 
   private fun initHeaderPoolObject(): GenericObjectPool<ByteBuffer> {

@@ -2,7 +2,6 @@ package app.server
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
 import java.nio.channels.ServerSocketChannel
@@ -32,18 +31,14 @@ class AcceptorThread: Thread {
   }
 
   override fun run() {
-    try {
-      while (isRunning.get()) {
-        select()
-      }
-    } catch (e: IOException) {
-      LOG.error("Accept Thread is exiting due to an unexpected error", e)
+    while (isRunning.get()) {
+      select()
     }
 
     try {
       acceptSelector.close()
-    } catch (e: IOException) {
-      LOG.error("Got an IOException while closing accept selector!", e)
+    } catch (e: Exception) {
+      LOG.error("Got an exception while closing accept selector!", e)
     }
 
     for (selectorThread in selectorThreads) {
@@ -66,8 +61,8 @@ class AcceptorThread: Thread {
           else -> LOG.warn("Unexpected state [{}] in select!", selectionKey.interestOps())
         }
       }
-    } catch (e: IOException) {
-      LOG.warn("Encountered an error while selecting!", e)
+    } catch (e: Exception) {
+      LOG.error("Encountered an error while selecting!", e)
     }
   }
 
@@ -80,7 +75,7 @@ class AcceptorThread: Thread {
       if (!selectorThread.addAcceptedConnection(clientChannel)) {
         clientChannel.close()
       }
-    } catch (e: IOException) {
+    } catch (e: Exception) {
       LOG.error("Error accepting connection", e)
     }
   }
