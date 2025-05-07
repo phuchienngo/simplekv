@@ -2,6 +2,7 @@ package app.server
 
 import app.core.Body
 import app.core.Header
+import org.apache.commons.pool2.impl.GenericObjectPool
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
@@ -12,13 +13,14 @@ class Message(
   val channelSocket: SocketChannel,
   val selectionKey: SelectionKey,
   val selectorThread: SelectorThread,
+  val headerPool: GenericObjectPool<ByteBuffer>
 ) {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(Message::class.java)
   }
 
   private var state = State.READING_HEADER
-  private var buffer: ByteBuffer = selectorThread.borrowHeaderBuffer()
+  private var buffer: ByteBuffer = headerPool.borrowObject().clear()
   lateinit var header: Header
   lateinit var body: Body
   private lateinit var responseBuffer: ByteBuffer
@@ -38,7 +40,7 @@ class Message(
       if (!buffer.hasRemaining()) {
         buffer.flip()
         header = parseHeader(buffer)
-        selectorThread.returnHeaderBuffer(buffer)
+        headerPool.returnObject(buffer.clear())
         if (!header.isMagicRequest()) {
           LOG.error("Invalid magic number in request: {}", header.magic)
           return false
@@ -143,7 +145,7 @@ class Message(
   }
 
   fun close() {
-    selectorThread.returnHeaderBuffer(buffer)
+    headerPool.returnObject(buffer.clear())
     selectionKey.cancel()
     try {
       channelSocket.close()
@@ -154,7 +156,7 @@ class Message(
 
   private fun prepareRead() {
     selectionKey.interestOps(SelectionKey.OP_READ)
-    buffer = selectorThread.borrowHeaderBuffer()
+    buffer = headerPool.borrowObject().clear()
     state = State.READING_HEADER
   }
 

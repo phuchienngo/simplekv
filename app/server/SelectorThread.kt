@@ -1,8 +1,8 @@
 package app.server
 
 import app.config.Config
-import app.handler.Router
 import app.utils.ByteBufferPoolFactory
+import com.google.common.hash.Hashing
 import com.lmax.disruptor.RingBuffer
 import com.lmax.disruptor.Sequence
 import com.lmax.disruptor.Sequencer
@@ -16,11 +16,12 @@ import java.nio.channels.SocketChannel
 import java.nio.channels.spi.SelectorProvider
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.random.Random
 
 class SelectorThread(
   config: Config,
   private val server: Server,
-  private val router: Router,
+  private val workers: List<Worker>,
   index: Int,
 ): Thread("${config.appName}-SelectorThread-$index") {
   companion object {
@@ -31,6 +32,8 @@ class SelectorThread(
   private val selector = SelectorProvider.provider().openSelector()
   private val isRunning: AtomicBoolean = AtomicBoolean(false)
   private val headerPool = initHeaderPoolObject()
+  private val hashFunction = Hashing.farmHashFingerprint64()
+  private val random = Random.Default
 
   init {
     ringBuffer.addGatingSequences(sequence)
@@ -47,15 +50,6 @@ class SelectorThread(
     ringBuffer.publish(next)
     selector.wakeup()
     return true
-  }
-
-  fun borrowHeaderBuffer(): ByteBuffer {
-    return headerPool.borrowObject().clear()
-  }
-
-  fun returnHeaderBuffer(buffer: ByteBuffer) {
-    buffer.clear()
-    headerPool.returnObject(buffer)
   }
 
   override fun run() {
@@ -119,7 +113,7 @@ class SelectorThread(
     var selectionKey: SelectionKey? = null
     try {
       selectionKey = channel.register(selector, SelectionKey.OP_READ)
-      val message = Message(channel, selectionKey, this)
+      val message = Message(channel, selectionKey, this, headerPool)
       selectionKey.attach(message)
     } catch (e: Exception) {
       LOG.error("Failed to register accepted connection to selector", e)
@@ -188,7 +182,7 @@ class SelectorThread(
     }
 
     if (message.isLoaded()) {
-      router.handle(message)
+      handleRequest(message)
     }
   }
 
@@ -213,5 +207,17 @@ class SelectorThread(
 
   private fun initRingBuffer(): RingBuffer<Container<Any>> {
     return RingBuffer.createMultiProducer(Container.FACTORY, 1024)
+  }
+
+  private fun handleRequest(message: Message) {
+    val workerIndex = if (message.body.key != null) {
+      val key = message.body.key!!.duplicate()
+      val hash = hashFunction.hashBytes(key)
+      Hashing.consistentHash(hash, workers.size)
+    } else {
+      random.nextInt(0, workers.size)
+    }
+
+    workers[workerIndex].dispatch(message)
   }
 }

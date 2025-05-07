@@ -1,9 +1,7 @@
 package app
 
 import app.config.Config
-import app.handler.Router
 import app.server.Server
-import com.google.common.hash.Hashing
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.Option
 import org.apache.commons.cli.Options
@@ -24,11 +22,8 @@ object MainApp {
     val config = configResult.getOrNull()!!
     val (_, port, workerNum, selectorNum) = config
     LOG.info("Application pid: {}", ProcessHandle.current().pid())
-    LOG.info("Setting up {} worker(s)", workerNum)
-    val hashFunction = Hashing.crc32c()
-    val router = Router(config, hashFunction)
-    LOG.info("Setting up {} selector(s)", selectorNum)
-    val server = Server(config, router)
+    LOG.info("Setting up {} worker(s), {} selector(s)", workerNum, selectorNum)
+    val server = Server(config)
 
     LOG.info("Starting server on {}", port)
     server.start()
