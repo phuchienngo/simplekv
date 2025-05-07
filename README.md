@@ -9,10 +9,7 @@
     - s: number of selector threads
 ## Features
 - [MemCached Binary Protocol](https://docs.memcached.org/protocols/binary/) support
-- Thread architecture:
-  - 1 dedicated connection acceptor thread
-  - N selector threads for I/O operations
-  - Worker threads for data processing
+- I/O Multiplexing
 - Key-based data partitioning:
   - Keys hashed to specific worker threads
   - Enables lock-free parallel processing

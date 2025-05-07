@@ -1,9 +1,9 @@
-package app.handler
+package app.server
 
 import app.config.Config
 import app.core.ErrorCode
 import app.core.Event
-import app.server.Message
+import app.handler.Handler
 import app.utils.Responses
 import com.lmax.disruptor.RingBuffer
 import com.lmax.disruptor.Sequence
@@ -12,12 +12,13 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicBoolean
 
-abstract class AbstractWorker(
+class Worker internal constructor(
   private val config: Config,
-  index: Int
+  index: Int,
+  private val handler: Handler
 ): Thread("${config.appName}-Worker-$index") {
   companion object {
-    private val LOG: Logger = LoggerFactory.getLogger(AbstractWorker::class.java)
+    private val LOG: Logger = LoggerFactory.getLogger(Worker::class.java)
   }
   private val ringBuffer = initRingBuffer()
   private val sequence = Sequence(Sequencer.INITIAL_CURSOR_VALUE)
@@ -26,8 +27,6 @@ abstract class AbstractWorker(
   init {
     ringBuffer.addGatingSequences(sequence)
   }
-
-  abstract fun process(event: Event)
 
   override fun run() {
     if (!isRunning.compareAndSet(false, true)) {
@@ -62,7 +61,7 @@ abstract class AbstractWorker(
     while (current + 1 <= availableSequence && ringBuffer.isAvailable(current + 1)) {
       val event = ringBuffer[++current]
       try {
-        process(event)
+        handler.handle(event)
       } catch (e: Exception) {
         LOG.error("Uncaught error when processing event at sequence {} event {}", sequence, event, e)
         val response = Responses.makeError(event.header, ErrorCode.InternalError)

@@ -1,22 +1,15 @@
 package app.handler
 
-import app.config.Config
 import app.core.CommandOpCodes
 import app.core.Event
-import app.datastructure.SwissMap
-import java.nio.ByteBuffer
 
-class Worker(config: Config, index: Int): AbstractWorker(config, index),
-  GetHandler,
+interface NotNullKeyHandler: GetHandler,
   MutateHandler,
   DeleteHandler,
   IncrementDecrementHandler,
   AppendPrependHandler {
-  override val valueMap = SwissMap<String, ByteBuffer>(10_000_000, 0.75f)
-  override val extrasMap = SwissMap<String, ByteBuffer>(10_000_000, 0.75f)
-  override val casMap = SwissMap<String, Long>(10_000_000, 0.75f)
 
-  override fun process(event: Event) {
+  fun handleNotNullKeyRequest(event: Event) {
     when (event.header.opcode) {
       CommandOpCodes.GET.value -> processGetCommand(event, CommandOpCodes.GET)
       CommandOpCodes.GETQ.value -> processGetCommand(event, CommandOpCodes.GETQ)
