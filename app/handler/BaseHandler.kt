@@ -20,7 +20,18 @@ interface BaseHandler {
   }
 
   fun processUnknownCommand(event: Event) {
-    val response = Responses.makeError(event.header, ErrorCode.UnknownCommand)
+    val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.UnknownCommand)
     event.reply(response)
+  }
+
+  fun copyBuffer(buffer: ByteBuffer?): ByteBuffer? {
+    if (buffer == null) {
+      return null
+    }
+    val newBuffer = ByteBuffer.allocateDirect(buffer.remaining())
+    newBuffer.put(buffer)
+    newBuffer.flip()
+    buffer.position(0)
+    return newBuffer
   }
 }

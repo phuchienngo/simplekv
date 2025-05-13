@@ -64,7 +64,7 @@ class Worker internal constructor(
         handler.handle(event)
       } catch (e: Exception) {
         LOG.error("Uncaught error when processing event at sequence {} event {}", sequence, event, e)
-        val response = Responses.makeError(event.header, ErrorCode.InternalError)
+        val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.InternalError)
         event.reply(response)
       }
     }

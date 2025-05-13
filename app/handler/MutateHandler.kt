@@ -11,7 +11,7 @@ import java.nio.ByteBuffer
 interface MutateHandler: BaseHandler {
   fun processMutateCommand(event: Event, command: CommandOpCodes) {
     if (!Validators.hasExtras(event) || !Validators.hasKey(event)) {
-      val response = Responses.makeError(event.header, ErrorCode.InvalidArguments)
+      val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.InvalidArguments)
       event.reply(response)
       return
     }
@@ -19,7 +19,7 @@ interface MutateHandler: BaseHandler {
     val currentCas = casMap.get(key)
     val requestCas = event.header.cas
     if (requestCas != 0L && requestCas != currentCas) {
-      val response = Responses.makeError(event.header, ErrorCode.KeyExists)
+      val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }
@@ -33,7 +33,7 @@ interface MutateHandler: BaseHandler {
       }
       CommandOpCodes.ADD, CommandOpCodes.ADDQ -> {
         if (valueMap.containsKey(key)) {
-          val response = Responses.makeError(event.header, ErrorCode.KeyExists)
+          val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
           event.reply(response)
           return
         }
@@ -41,7 +41,7 @@ interface MutateHandler: BaseHandler {
       }
       CommandOpCodes.REPLACE, CommandOpCodes.REPLACEQ -> {
         if (!valueMap.containsKey(key)) {
-          val response = Responses.makeError(event.header, ErrorCode.KeyNotFound)
+          val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyNotFound)
           event.reply(response)
           return
         }
@@ -52,13 +52,13 @@ interface MutateHandler: BaseHandler {
   }
 
   private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteBuffer?, extras: ByteBuffer?, cas: Long) {
-    valueMap[key] = value?.duplicate()
-    extrasMap[key] = extras?.duplicate()
+    valueMap[key] = copyBuffer(value)
+    extrasMap[key] = copyBuffer(extras)
     casMap[key] = cas
     if (Commands.isQuietCommand(command)) {
       event.done()
     } else {
-      val response = Responses.makeResponse(event.header, cas, null, null, null)
+      val response = Responses.makeResponse(event.responseBuffer, event.header, cas, null, null, null)
       event.reply(response)
     }
   }

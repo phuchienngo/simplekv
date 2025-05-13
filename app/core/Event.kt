@@ -14,6 +14,8 @@ class Event {
     get() = message.header
   val body: Body
     get() = message.body
+  val responseBuffer: ByteBuffer
+    get() = message.buffer
 
   fun reply(buffer: ByteBuffer) {
     message.reply(buffer)

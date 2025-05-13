@@ -12,12 +12,12 @@ import java.nio.charset.StandardCharsets
 interface IncrementDecrementHandler: BaseHandler {
   fun processIncrementDecrementCommand(event: Event, command: CommandOpCodes) {
     if (!Validators.hasExtras(event) || !Validators.hasKey(event) || Validators.hasValue(event)) {
-      val response = Responses.makeError(event.header, ErrorCode.InvalidArguments)
+      val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.InvalidArguments)
       event.reply(response)
       return
     }
 
-    val extras = event.message.body.extras!!
+    val extras = event.body.extras!!
     val delta = extras.getLong().toULong()
     val initialValue = extras.getLong().toULong()
     val expiration = extras.getInt()
@@ -27,7 +27,7 @@ interface IncrementDecrementHandler: BaseHandler {
     val isKeyExists = valueMap.containsKey(key)
 
     if (isKeyExists && event.header.cas != 0L && event.header.cas != casMap[key]) {
-      val response = Responses.makeError(event.header, ErrorCode.KeyExists)
+      val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }
@@ -35,7 +35,7 @@ interface IncrementDecrementHandler: BaseHandler {
     val now = System.currentTimeMillis()
     if (!isKeyExists) {
       if (expiration == 0xFFFFFFFF.toInt()) {
-        val response = Responses.makeError(event.header, ErrorCode.KeyNotFound)
+        val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyNotFound)
         event.reply(response)
         return
       }
@@ -71,11 +71,12 @@ interface IncrementDecrementHandler: BaseHandler {
   private fun applyAndResponse(key: String, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes) {
     valueMap[key] = createCounterValueBuffer(newValue)
     casMap[key] = cas
-    extrasMap[key] = event.message.body.extras!!
+    extrasMap[key] = copyBuffer(event.body.extras)
     if (Commands.isQuietCommand(command)) {
       event.done()
     } else {
       val response = Responses.makeResponse(
+        event.responseBuffer,
         event.header,
         cas,
         null,

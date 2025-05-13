@@ -10,7 +10,7 @@ import app.utils.Validators
 interface GetHandler: BaseHandler {
   fun processGetCommand(event: Event, command: CommandOpCodes) {
     if (Validators.hasExtras(event) || !Validators.hasKey(event) || Validators.hasValue(event) ) {
-      val response = Responses.makeError(event.header, ErrorCode.InvalidArguments)
+      val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.InvalidArguments)
       event.reply(response)
       return
     }
@@ -20,7 +20,7 @@ interface GetHandler: BaseHandler {
       if (Commands.isQuietCommand(command)) {
         event.done()
       } else {
-        val response = Responses.makeError(event.header, ErrorCode.KeyNotFound)
+        val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyNotFound)
         event.reply(response)
       }
       return
@@ -30,6 +30,7 @@ interface GetHandler: BaseHandler {
     val extras = extrasMap[key]
     val cas = casMap[key]!!
     val response = Responses.makeResponse(
+      event.responseBuffer,
       event.header,
       cas,
       extras?.duplicate(),

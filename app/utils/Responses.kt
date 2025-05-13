@@ -6,10 +6,10 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 object Responses {
-  fun makeError(header: Header, error: ErrorCode): ByteBuffer {
+  fun makeError(buffer: ByteBuffer, header: Header, error: ErrorCode): ByteBuffer {
     val errorMessage = StandardCharsets.US_ASCII.encode(error.description)
     val errorLength = errorMessage.limit()
-    val responseBuffer = ByteBuffer.allocateDirect(24 + errorLength)
+    val responseBuffer = ensureBufferSize(buffer, 24 + errorLength)
     responseBuffer.put(0x81.toByte()) // magic
     responseBuffer.put(0) // opcode
     responseBuffer.putShort(0) // key length
@@ -24,12 +24,12 @@ object Responses {
     return responseBuffer
   }
 
-  fun makeResponse(header: Header, cas: Long, extras: ByteBuffer?, key: ByteBuffer?, value: ByteBuffer?): ByteBuffer {
+  fun makeResponse(buffer: ByteBuffer, header: Header, cas: Long, extras: ByteBuffer?, key: ByteBuffer?, value: ByteBuffer?): ByteBuffer {
     val extrasLength = extras?.limit() ?: 0
     val keyLength = key?.limit() ?: 0
     val valueLength = value?.limit() ?: 0
     val totalBodyLength = extrasLength + keyLength + valueLength
-    val responseBuffer = ByteBuffer.allocateDirect(24 + totalBodyLength)
+    val responseBuffer = ensureBufferSize(buffer, 24 + totalBodyLength)
     responseBuffer.put(0x81.toByte()) // magic
     responseBuffer.put(header.opcode) // opcode
     responseBuffer.putShort(keyLength.toShort()) // key length
@@ -44,5 +44,13 @@ object Responses {
     value?.let(responseBuffer::put)
     responseBuffer.flip()
     return responseBuffer
+  }
+
+  private fun ensureBufferSize(buffer: ByteBuffer, size: Int): ByteBuffer {
+    return if (size <= buffer.capacity()) {
+      buffer.position(0).limit(size)
+    } else {
+      ByteBuffer.allocateDirect(size)
+    }
   }
 }

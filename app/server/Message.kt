@@ -2,7 +2,6 @@ package app.server
 
 import app.core.Body
 import app.core.Header
-import org.apache.commons.pool2.impl.GenericObjectPool
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
@@ -13,17 +12,15 @@ class Message(
   val channelSocket: SocketChannel,
   val selectionKey: SelectionKey,
   val selectorThread: SelectorThread,
-  val headerPool: GenericObjectPool<ByteBuffer>
 ) {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(Message::class.java)
   }
 
   private var state = State.READING_HEADER
-  private var buffer: ByteBuffer = headerPool.borrowObject().clear()
+  var buffer: ByteBuffer = ByteBuffer.allocateDirect(256).limit(24)
   lateinit var header: Header
   lateinit var body: Body
-  private lateinit var responseBuffer: ByteBuffer
 
   @JvmSynthetic
   internal fun isLoaded(): Boolean {
@@ -40,12 +37,12 @@ class Message(
       if (!buffer.hasRemaining()) {
         buffer.flip()
         header = parseHeader(buffer)
-        headerPool.returnObject(buffer.clear())
+        buffer.position(0)
         if (!header.isMagicRequest()) {
           LOG.error("Invalid magic number in request: {}", header.magic)
           return false
         }
-        buffer = ByteBuffer.allocateDirect(header.totalBodyLength)
+        buffer = ensureBufferSize(buffer, header.totalBodyLength)
         state = State.READING_BODY
       }
     }
@@ -84,8 +81,8 @@ class Message(
   internal fun write(): Boolean {
     if (state == State.WRITING) {
       try {
-        while (responseBuffer.hasRemaining()) {
-          val bytesWritten = channelSocket.write(responseBuffer)
+        while (buffer.hasRemaining()) {
+          val bytesWritten = channelSocket.write(buffer)
           if (bytesWritten == 0) {
             return true
           }
@@ -113,7 +110,7 @@ class Message(
   }
 
   fun reply(buffer: ByteBuffer) {
-    responseBuffer = buffer
+    this.buffer = buffer
     state = State.AWAITING_REGISTER_WRITE
     requestInterestChange()
   }
@@ -145,7 +142,6 @@ class Message(
   }
 
   fun close() {
-    headerPool.returnObject(buffer.clear())
     selectionKey.cancel()
     try {
       channelSocket.close()
@@ -156,7 +152,7 @@ class Message(
 
   private fun prepareRead() {
     selectionKey.interestOps(SelectionKey.OP_READ)
-    buffer = headerPool.borrowObject().clear()
+    buffer = ensureBufferSize(buffer, 24)
     state = State.READING_HEADER
   }
 
@@ -197,5 +193,15 @@ class Message(
     WRITING,
     AWAITING_REGISTER_READ,
     AWAITING_CLOSE
+  }
+
+  private fun ensureBufferSize(buffer: ByteBuffer, size: Int): ByteBuffer {
+    return if (size <= buffer.capacity()) {
+      buffer.position(0)
+        .limit(size)
+    } else {
+      ByteBuffer.allocateDirect(size)
+        .limit(size)
+    }
   }
 }

@@ -1,20 +1,15 @@
 package app.server
 
 import app.config.Config
-import app.utils.ByteBufferPoolFactory
 import com.google.common.hash.Hashing
 import com.lmax.disruptor.RingBuffer
 import com.lmax.disruptor.Sequence
 import com.lmax.disruptor.Sequencer
-import org.apache.commons.pool2.impl.GenericObjectPool
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
 import java.nio.channels.spi.SelectorProvider
-import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
 
@@ -31,7 +26,6 @@ class SelectorThread(
   private val sequence = Sequence(Sequencer.INITIAL_CURSOR_VALUE)
   private val selector = SelectorProvider.provider().openSelector()
   private val isRunning: AtomicBoolean = AtomicBoolean(false)
-  private val headerPool = initHeaderPoolObject()
   private val hashFunction = Hashing.farmHashFingerprint64()
   private val random = Random.Default
 
@@ -113,7 +107,7 @@ class SelectorThread(
     var selectionKey: SelectionKey? = null
     try {
       selectionKey = channel.register(selector, SelectionKey.OP_READ)
-      val message = Message(channel, selectionKey, this, headerPool)
+      val message = Message(channel, selectionKey, this)
       selectionKey.attach(message)
     } catch (e: Exception) {
       LOG.error("Failed to register accepted connection to selector", e)
@@ -191,18 +185,6 @@ class SelectorThread(
     if (!message.write()) {
       cleanUpSelectionKey(selectionKey)
     }
-  }
-
-  private fun initHeaderPoolObject(): GenericObjectPool<ByteBuffer> {
-    val poolConfig = GenericObjectPoolConfig<ByteBuffer>()
-    poolConfig.maxTotal = 100
-    poolConfig.minIdle = 16
-    poolConfig.testOnBorrow = true
-    poolConfig.testOnReturn = true
-    poolConfig.blockWhenExhausted = false
-    poolConfig.setMaxWait(Duration.ofSeconds(-1))
-    poolConfig.maxTotal = -1
-    return GenericObjectPool(ByteBufferPoolFactory(24, true), poolConfig)
   }
 
   private fun initRingBuffer(): RingBuffer<Container<Any>> {

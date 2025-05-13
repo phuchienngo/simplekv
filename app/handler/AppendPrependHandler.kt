@@ -12,7 +12,7 @@ interface AppendPrependHandler: BaseHandler {
   @Suppress("DuplicatedCode")
   fun processAppendPrependCommand(event: Event, command: CommandOpCodes) {
     if (Validators.hasExtras(event) || !Validators.hasKey(event) || !Validators.hasValue(event)) {
-      val response = Responses.makeError(event.header, ErrorCode.InvalidArguments)
+      val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.InvalidArguments)
       event.reply(response)
       return
     }
@@ -22,7 +22,7 @@ interface AppendPrependHandler: BaseHandler {
       if (Commands.isQuietCommand(command)) {
         event.done()
       } else {
-        val response = Responses.makeError(event.header, ErrorCode.KeyNotFound)
+        val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyNotFound)
         event.reply(response)
       }
       return
@@ -30,7 +30,7 @@ interface AppendPrependHandler: BaseHandler {
 
     val currentCas = casMap[key]
     if (event.header.cas != 0L && event.header.cas != currentCas) {
-      val response = Responses.makeError(event.header, ErrorCode.KeyExists)
+      val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }
@@ -53,6 +53,7 @@ interface AppendPrependHandler: BaseHandler {
     }
 
     val response = Responses.makeResponse(
+      event.responseBuffer,
       event.header,
       now,
       null,
