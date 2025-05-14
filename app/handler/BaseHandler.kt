@@ -1,5 +1,7 @@
 package app.handler
 
+import app.allocator.BuddyAllocator
+import app.allocator.MemoryBlock
 import app.core.Event
 import app.core.ErrorCode
 import app.datastructure.SwissMap
@@ -8,9 +10,12 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 interface BaseHandler {
-  val valueMap: SwissMap<String, ByteBuffer>
-  val extrasMap: SwissMap<String, ByteBuffer>
+  val valueMap: SwissMap<String, MemoryBlock>
+  val extrasMap: SwissMap<String, MemoryBlock>
   val casMap: SwissMap<String, Long>
+  val allocators: MutableList<BuddyAllocator>
+  val minBlockSize: Int
+  val maxBlockSize: Int
 
   fun decodeKey(buffer: ByteBuffer): String {
     return StandardCharsets
@@ -24,14 +29,26 @@ interface BaseHandler {
     event.reply(response)
   }
 
-  fun copyBuffer(buffer: ByteBuffer?): ByteBuffer? {
-    if (buffer == null) {
-      return null
+  fun allocateBlock(size: Int): MemoryBlock {
+    if (size > maxBlockSize) {
+      // big enough, allocate directly
+      return MemoryBlock(
+        ByteBuffer.allocate(size),
+        0,
+        size,
+        null
+      )
     }
-    val newBuffer = ByteBuffer.allocateDirect(buffer.remaining())
-    newBuffer.put(buffer)
-    newBuffer.flip()
-    buffer.position(0)
-    return newBuffer
+    for (allocator in allocators) {
+      val block = allocator.allocate(size) ?: continue
+      return block
+    }
+    val newAllocator = BuddyAllocator(minBlockSize, maxBlockSize)
+    allocators.add(newAllocator)
+    return newAllocator.allocate(size)!!
+  }
+
+  fun freeBlock(block: MemoryBlock) {
+    block.allocator?.free(block)
   }
 }

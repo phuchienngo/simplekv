@@ -1,5 +1,6 @@
 package app.handler
 
+import app.allocator.MemoryBlock
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
@@ -44,7 +45,7 @@ interface IncrementDecrementHandler: BaseHandler {
       return
     }
 
-    val currentValue = parseStringValue(valueMap[key]!!)
+    val currentValue = parseStringValue(valueMap[key]!!.buffer)
     val newValue = when (command) {
       CommandOpCodes.INCREMENT,
       CommandOpCodes.INCREMENTQ -> currentValue + delta
@@ -69,9 +70,16 @@ interface IncrementDecrementHandler: BaseHandler {
   }
 
   private fun applyAndResponse(key: String, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes) {
+    extrasMap[key]?.let(this::freeBlock)
+    valueMap[key]?.let(this::freeBlock)
     valueMap[key] = createCounterValueBuffer(newValue)
     casMap[key] = cas
-    extrasMap[key] = copyBuffer(event.body.extras)
+    extrasMap[key] = event.body.extras?.let {
+      return@let allocateBlock(it.remaining()).apply {
+        buffer.put(it.duplicate())
+        buffer.flip()
+      }
+    }
     if (Commands.isQuietCommand(command)) {
       event.done()
     } else {
@@ -89,8 +97,13 @@ interface IncrementDecrementHandler: BaseHandler {
     }
   }
 
-  private fun createCounterValueBuffer(value: ULong): ByteBuffer {
-    return StandardCharsets.US_ASCII.encode("$value")
+  private fun createCounterValueBuffer(value: ULong): MemoryBlock {
+    return StandardCharsets.US_ASCII.encode("$value").let {
+      val block = allocateBlock(it.remaining())
+      block.buffer.put(it.duplicate())
+      block.buffer.flip()
+      return@let block
+    }
   }
 
   private fun isAllNumber(value: String): Boolean {

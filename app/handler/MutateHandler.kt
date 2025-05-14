@@ -52,8 +52,20 @@ interface MutateHandler: BaseHandler {
   }
 
   private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteBuffer?, extras: ByteBuffer?, cas: Long) {
-    valueMap[key] = copyBuffer(value)
-    extrasMap[key] = copyBuffer(extras)
+    valueMap[key]?.let(this::freeBlock)
+    extrasMap[key]?.let(this::freeBlock)
+    valueMap[key] = value?.let {
+      return@let allocateBlock(it.remaining()).apply {
+        buffer.put(it.duplicate())
+        buffer.flip()
+      }
+    }
+    extrasMap[key] = extras?.let {
+      return@let allocateBlock(it.remaining()).apply {
+        buffer.put(it.duplicate())
+        buffer.flip()
+      }
+    }
     casMap[key] = cas
     if (Commands.isQuietCommand(command)) {
       event.done()

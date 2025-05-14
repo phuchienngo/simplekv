@@ -35,8 +35,8 @@ interface DeleteHandler: BaseHandler {
       return
     }
 
-    valueMap.remove(key)
-    extrasMap.remove(key)
+    valueMap.remove(key)?.let(this::freeBlock)
+    extrasMap.remove(key)?.let(this::freeBlock)
     casMap.remove(key)
     if (Commands.isQuietCommand(command)) {
       event.done()

@@ -1,12 +1,12 @@
 package app.handler
 
+import app.allocator.MemoryBlock
 import app.core.CommandOpCodes
 import app.core.ErrorCode
 import app.core.Event
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
-import java.nio.ByteBuffer
 
 interface AppendPrependHandler: BaseHandler {
   @Suppress("DuplicatedCode")
@@ -36,17 +36,23 @@ interface AppendPrependHandler: BaseHandler {
     }
 
     val existingValue = valueMap[key]!!
+    val appendValue = MemoryBlock(
+      event.body.value!!,
+      0,
+      event.body.value!!.remaining()
+    )
     val newValue = when (command) {
       CommandOpCodes.APPEND,
-      CommandOpCodes.APPENDQ -> concat(existingValue, event.body.value!!)
+      CommandOpCodes.APPENDQ -> concat(existingValue, appendValue)
       CommandOpCodes.PREPEND,
-      CommandOpCodes.PREPENDQ -> concat(event.body.value!!, existingValue)
+      CommandOpCodes.PREPENDQ -> concat(appendValue, existingValue)
       else -> existingValue // This case should never happen
     }
 
     val now = System.currentTimeMillis()
     valueMap[key] = newValue
     casMap[key] = now
+    freeBlock(existingValue)
     if (Commands.isQuietCommand(command)) {
       event.done()
       return
@@ -63,11 +69,11 @@ interface AppendPrependHandler: BaseHandler {
     event.reply(response)
   }
 
-  private fun concat(b1: ByteBuffer, b2: ByteBuffer): ByteBuffer {
-    val result: ByteBuffer = ByteBuffer.allocate(b1.remaining() + b2.remaining())
-    result.put(b1.duplicate())
-    result.put(b2.duplicate())
-    result.flip()
-    return result
+  private fun concat(b1: MemoryBlock, b2: MemoryBlock): MemoryBlock {
+    val block = allocateBlock(b1.buffer.remaining() + b2.buffer.remaining())
+    block.buffer.put(b1.buffer.duplicate())
+    block.buffer.put(b2.buffer.duplicate())
+    block.buffer.flip()
+    return block
   }
 }

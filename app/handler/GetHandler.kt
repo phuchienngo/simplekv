@@ -33,14 +33,14 @@ interface GetHandler: BaseHandler {
       event.responseBuffer,
       event.header,
       cas,
-      extras?.duplicate(),
+      extras?.buffer?.duplicate(),
       if (command == CommandOpCodes.GETK) {
         event.body.key?.duplicate()
       } else {
         null
       },
       if (command == CommandOpCodes.GET || command == CommandOpCodes.GETK) {
-        value?.duplicate()
+        value?.buffer?.duplicate()
       } else {
         null
       }
