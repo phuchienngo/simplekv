@@ -43,12 +43,12 @@ kt_jvm_binary(
         "utils/Validators.kt",
     ],
     jvm_flags = [
-        "-Xms1G",
-        "-Xmx4G",
+        "-Xms4G",
+        "-Xmx16G",
         "-XX:+UseZGC",
         "-XX:+ZGenerational",
         "-XX:InitiatingHeapOccupancyPercent=70",
-        "-XX:SoftMaxHeapSize=1536m",
+        "-XX:SoftMaxHeapSize=4G",
     ],
     main_class = "app.MainApp",
     deps = [
