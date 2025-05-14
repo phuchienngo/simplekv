@@ -32,27 +32,30 @@ class BuddyAllocator {
     }
 
     val actualAllocatedSize = max(minBlockSize, nextPowerOfTwo(size))
-    return internalAllocate(0, maxBlockSize, actualAllocatedSize)
+    return internalAllocate(0, size, maxBlockSize, actualAllocatedSize)
   }
 
-  private fun internalAllocate(blockIndex: Int, currentSize: Int, actualSize: Int): MemoryBlock? {
-    if (blockUsage[blockIndex] == BlockStatus.ALLOCATED || blockIndex >= blockCount) {
+  private fun internalAllocate(blockIndex: Int, requestSize: Int, currentSize: Int, actualSize: Int): MemoryBlock? {
+    if (blockIndex >= blockCount || blockUsage[blockIndex] == BlockStatus.ALLOCATED) {
       return null
     }
     if (currentSize == actualSize) {
+      if (blockUsage[blockIndex] == BlockStatus.PARTIAL) {
+        return null
+      }
       blockUsage[blockIndex] = BlockStatus.ALLOCATED
       val offset = blockIndex * minBlockSize
       val slice = buffer.duplicate()
         .position(offset)
-        .limit(offset + actualSize)
+        .limit(offset + requestSize)
         .slice()
-      return MemoryBlock(slice, offset, actualSize, this)
+      return MemoryBlock(slice, offset, this)
     }
     val nextSize = currentSize shr 1
     val firstSibling = 2 * blockIndex + 1
     val secondSibling = 2 * blockIndex + 2
-    val allocatedBlock = internalAllocate(firstSibling, nextSize, actualSize)
-      ?: internalAllocate(secondSibling, nextSize, actualSize)
+    val allocatedBlock = internalAllocate(firstSibling, requestSize, nextSize, actualSize)
+      ?: internalAllocate(secondSibling, requestSize, nextSize, actualSize)
 
     if (allocatedBlock != null) {
       if (

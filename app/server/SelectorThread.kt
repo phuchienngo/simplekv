@@ -30,6 +30,7 @@ class SelectorThread(
   private val random = Random.Default
 
   init {
+    isDaemon = false
     ringBuffer.addGatingSequences(sequence)
   }
 

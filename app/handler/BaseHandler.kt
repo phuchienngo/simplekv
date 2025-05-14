@@ -35,7 +35,6 @@ interface BaseHandler {
       return MemoryBlock(
         ByteBuffer.allocate(size),
         0,
-        size,
         null
       )
     }

@@ -29,6 +29,7 @@ class AcceptorThread: Thread {
     isRunning = AtomicBoolean(false)
     increment = AtomicLong(0)
     serverChannel.register(acceptSelector, SelectionKey.OP_ACCEPT)
+    isDaemon = false
   }
 
   override fun run() {

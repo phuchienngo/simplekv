@@ -38,8 +38,7 @@ interface AppendPrependHandler: BaseHandler {
     val existingValue = valueMap[key]!!
     val appendValue = MemoryBlock(
       event.body.value!!,
-      0,
-      event.body.value!!.remaining()
+      0
     )
     val newValue = when (command) {
       CommandOpCodes.APPEND,

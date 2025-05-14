@@ -25,6 +25,7 @@ class Worker internal constructor(
   private val isRunning: AtomicBoolean = AtomicBoolean(false)
 
   init {
+    isDaemon = false
     ringBuffer.addGatingSequences(sequence)
   }
 

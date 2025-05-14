@@ -29,6 +29,10 @@ object MainApp {
     server.start()
     LOG.info("Server is started on {}", port)
 
+    Thread.setDefaultUncaughtExceptionHandler { thread, exception ->
+      LOG.error("Uncaught exception in thread {}", thread.name, exception)
+    }
+
     Runtime.getRuntime().addShutdownHook(Thread {
       LOG.info("Shutting down server")
       server.stop()
