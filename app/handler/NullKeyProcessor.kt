@@ -6,9 +6,7 @@ import app.core.Event
 import app.utils.Responses
 import java.nio.ByteBuffer
 
-interface NullKeyHandler {
-  val version: ByteBuffer
-
+class NullKeyProcessor(private val version: ByteBuffer) {
   fun handleNullKeyRequest(event: Event) {
     when (event.header.opcode) {
       CommandOpCodes.NOOP.value -> {

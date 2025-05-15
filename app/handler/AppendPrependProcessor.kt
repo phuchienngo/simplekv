@@ -1,16 +1,21 @@
 package app.handler
 
+import app.allocator.MemoryAllocator
 import app.allocator.MemoryBlock
 import app.core.CommandOpCodes
 import app.core.ErrorCode
 import app.core.Event
+import app.datastructure.KeyValueStore
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
 
-interface AppendPrependHandler: BaseHandler {
+class AppendPrependProcessor(
+  private val keyValueStore: KeyValueStore,
+  private val memoryAllocator: MemoryAllocator
+): BaseProcessor() {
   @Suppress("DuplicatedCode")
-  fun processAppendPrependCommand(event: Event, command: CommandOpCodes) {
+  override fun process(event: Event, command: CommandOpCodes) {
     if (Validators.hasExtras(event) || !Validators.hasKey(event) || !Validators.hasValue(event)) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.InvalidArguments)
       event.reply(response)
@@ -18,7 +23,7 @@ interface AppendPrependHandler: BaseHandler {
     }
 
     val key = decodeKey(event.body.key!!)
-    if (!valueMap.containsKey(key)) {
+    if (!keyValueStore.valueMap.containsKey(key)) {
       if (Commands.isQuietCommand(command)) {
         event.done()
       } else {
@@ -28,14 +33,14 @@ interface AppendPrependHandler: BaseHandler {
       return
     }
 
-    val currentCas = casMap[key]
+    val currentCas = keyValueStore.casMap[key]
     if (event.header.cas != 0L && event.header.cas != currentCas) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }
 
-    val existingValue = valueMap[key]!!
+    val existingValue = keyValueStore.valueMap[key]!!
     val appendValue = MemoryBlock(
       event.body.value!!,
       0
@@ -49,9 +54,9 @@ interface AppendPrependHandler: BaseHandler {
     }
 
     val now = System.currentTimeMillis()
-    valueMap[key] = newValue
-    casMap[key] = now
-    freeBlock(existingValue)
+    keyValueStore.valueMap[key] = newValue
+    keyValueStore.casMap[key] = now
+    memoryAllocator.freeBlock(existingValue)
     if (Commands.isQuietCommand(command)) {
       event.done()
       return
@@ -69,7 +74,7 @@ interface AppendPrependHandler: BaseHandler {
   }
 
   private fun concat(b1: MemoryBlock, b2: MemoryBlock): MemoryBlock {
-    val block = allocateBlock(b1.buffer.remaining() + b2.buffer.remaining())
+    val block = memoryAllocator.allocateBlock(b1.buffer.remaining() + b2.buffer.remaining())
     block.buffer.put(b1.buffer.duplicate())
     block.buffer.put(b2.buffer.duplicate())
     block.buffer.flip()

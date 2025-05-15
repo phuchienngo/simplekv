@@ -10,12 +10,12 @@
 ## Features
 - [MemCached Binary Protocol](https://docs.memcached.org/protocols/binary/) support
 - I/O Multiplexing
-- Key-based data partitioning:
-  - Keys hashed to specific worker threads
-  - Enables lock-free parallel processing
-- LMAX Disruptor for efficient thread communication:
-  - Lock-free ring buffer design
-  - High-throughput data transfer between selectors and workers
+- Key-based data partitioning with Consistent hashing for lock-free parallel processing
+- LMAX Disruptor for efficient thread communication
+- Custom memory management with Buddy Allocation algorithm:
+  - Reducing OS overhead on frequent dynamic memory allocation
+  - O(h) allocation and deallocation complexity (where h is the height of the tree, equal to log₂(maxBlockSize/minBlockSize))
+  - Using array-based complete binary tree for efficient memory block management
 - Graceful shutdown
 - Swiss table data structure
 - Bazel build system for simplified development environment

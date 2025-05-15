@@ -1,15 +1,20 @@
 package app.handler
 
+import app.allocator.MemoryAllocator
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
+import app.datastructure.KeyValueStore
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
 
-interface DeleteHandler: BaseHandler {
+class DeleteProcessor(
+  private val keyValueStore: KeyValueStore,
+  private val memoryAllocator: MemoryAllocator
+): BaseProcessor() {
   @Suppress("DuplicatedCode")
-  fun processDeleteCommand(event: Event, command: CommandOpCodes) {
+  override fun process(event: Event, command: CommandOpCodes) {
     if (Validators.hasExtras(event) || Validators.hasValue(event) || !Validators.hasKey(event)) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.InvalidArguments)
       event.reply(response)
@@ -17,7 +22,7 @@ interface DeleteHandler: BaseHandler {
     }
 
     val key = decodeKey(event.body.key!!)
-    if (!valueMap.containsKey(key)) {
+    if (!keyValueStore.valueMap.containsKey(key)) {
       if (Commands.isQuietCommand(command)) {
         event.done()
       } else {
@@ -27,7 +32,7 @@ interface DeleteHandler: BaseHandler {
       return
     }
 
-    val currentCas = casMap[key]
+    val currentCas = keyValueStore.casMap[key]
     val requestCas = event.header.cas
     if (requestCas != 0L && requestCas != currentCas) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
@@ -35,9 +40,9 @@ interface DeleteHandler: BaseHandler {
       return
     }
 
-    valueMap.remove(key)?.let(this::freeBlock)
-    extrasMap.remove(key)?.let(this::freeBlock)
-    casMap.remove(key)
+    keyValueStore.valueMap.remove(key)?.let(memoryAllocator::freeBlock)
+    keyValueStore.extrasMap.remove(key)?.let(memoryAllocator::freeBlock)
+    keyValueStore.casMap.remove(key)
     if (Commands.isQuietCommand(command)) {
       event.done()
       return

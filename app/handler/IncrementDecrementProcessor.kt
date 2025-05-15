@@ -1,17 +1,22 @@
 package app.handler
 
+import app.allocator.MemoryAllocator
 import app.allocator.MemoryBlock
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
+import app.datastructure.KeyValueStore
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-interface IncrementDecrementHandler: BaseHandler {
-  fun processIncrementDecrementCommand(event: Event, command: CommandOpCodes) {
+class IncrementDecrementProcessor(
+  private val keyValueStore: KeyValueStore,
+  private val memoryAllocator: MemoryAllocator
+): BaseProcessor() {
+  override fun process(event: Event, command: CommandOpCodes) {
     if (!Validators.hasExtras(event) || !Validators.hasKey(event) || Validators.hasValue(event)) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.InvalidArguments)
       event.reply(response)
@@ -25,9 +30,9 @@ interface IncrementDecrementHandler: BaseHandler {
     extras.position(0)
 
     val key = decodeKey(event.body.key!!)
-    val isKeyExists = valueMap.containsKey(key)
+    val isKeyExists = keyValueStore.valueMap.containsKey(key)
 
-    if (isKeyExists && event.header.cas != 0L && event.header.cas != casMap[key]) {
+    if (isKeyExists && event.header.cas != 0L && event.header.cas != keyValueStore.casMap[key]) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
@@ -45,7 +50,7 @@ interface IncrementDecrementHandler: BaseHandler {
       return
     }
 
-    val currentValue = parseStringValue(valueMap[key]!!.buffer)
+    val currentValue = parseStringValue(keyValueStore.valueMap[key]!!.buffer)
     val newValue = when (command) {
       CommandOpCodes.INCREMENT,
       CommandOpCodes.INCREMENTQ -> currentValue + delta
@@ -70,12 +75,12 @@ interface IncrementDecrementHandler: BaseHandler {
   }
 
   private fun applyAndResponse(key: String, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes) {
-    extrasMap[key]?.let(this::freeBlock)
-    valueMap[key]?.let(this::freeBlock)
-    valueMap[key] = createCounterValueBuffer(newValue)
-    casMap[key] = cas
-    extrasMap[key] = event.body.extras?.let {
-      return@let allocateBlock(it.remaining()).apply {
+    keyValueStore.extrasMap[key]?.let(memoryAllocator::freeBlock)
+    keyValueStore.valueMap[key]?.let(memoryAllocator::freeBlock)
+    keyValueStore.valueMap[key] = createCounterValueBuffer(newValue)
+    keyValueStore.casMap[key] = cas
+    keyValueStore.extrasMap[key] = event.body.extras?.let {
+      return@let memoryAllocator.allocateBlock(it.remaining()).apply {
         buffer.put(it.duplicate())
         buffer.flip()
       }
@@ -99,7 +104,7 @@ interface IncrementDecrementHandler: BaseHandler {
 
   private fun createCounterValueBuffer(value: ULong): MemoryBlock {
     return StandardCharsets.US_ASCII.encode("$value").let {
-      val block = allocateBlock(it.remaining())
+      val block = memoryAllocator.allocateBlock(it.remaining())
       block.buffer.put(it.duplicate())
       block.buffer.flip()
       return@let block

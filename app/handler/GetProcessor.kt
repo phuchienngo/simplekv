@@ -3,12 +3,16 @@ package app.handler
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
+import app.datastructure.KeyValueStore
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
 
-interface GetHandler: BaseHandler {
-  fun processGetCommand(event: Event, command: CommandOpCodes) {
+class GetProcessor(
+  private val keyValueStore: KeyValueStore
+): BaseProcessor() {
+  @Suppress("DuplicatedCode")
+  override fun process(event: Event, command: CommandOpCodes) {
     if (Validators.hasExtras(event) || !Validators.hasKey(event) || Validators.hasValue(event) ) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.InvalidArguments)
       event.reply(response)
@@ -16,7 +20,7 @@ interface GetHandler: BaseHandler {
     }
 
     val key = decodeKey(event.body.key!!)
-    if (!valueMap.containsKey(key)) {
+    if (!keyValueStore.valueMap.containsKey(key)) {
       if (Commands.isQuietCommand(command)) {
         event.done()
       } else {
@@ -26,9 +30,9 @@ interface GetHandler: BaseHandler {
       return
     }
 
-    val value = valueMap[key]
-    val extras = extrasMap[key]
-    val cas = casMap[key]!!
+    val value = keyValueStore.valueMap[key]
+    val extras = keyValueStore.extrasMap[key]
+    val cas = keyValueStore.casMap[key]!!
     val response = Responses.makeResponse(
       event.responseBuffer,
       event.header,
