@@ -14,10 +14,6 @@ class BuddyAllocator {
   private val blockUsage: Array<BlockStatus>
 
   constructor(minBlockSize: Int, maxBlockSize: Int) {
-    Preconditions.checkArgument(isPowerOfTwo(minBlockSize))
-    Preconditions.checkArgument(isPowerOfTwo(maxBlockSize))
-    Preconditions.checkArgument(minBlockSize <= maxBlockSize)
-    Preconditions.checkArgument(maxBlockSize % minBlockSize == 0)
     this.minBlockSize = minBlockSize
     this.maxBlockSize = maxBlockSize
     this.maxHeight = log2((maxBlockSize / minBlockSize).toDouble()).toInt()

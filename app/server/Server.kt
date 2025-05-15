@@ -25,7 +25,7 @@ class Server(private val config: Config) {
       return@map Worker(
         config,
         index,
-        MainHandler()
+        MainHandler(config)
       )
     }
   }

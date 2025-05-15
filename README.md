@@ -12,10 +12,11 @@
 - I/O Multiplexing
 - Key-based data partitioning with Consistent hashing for lock-free parallel processing
 - LMAX Disruptor for efficient thread communication
-- Custom memory management with Buddy Allocation algorithm:
-  - Reducing OS overhead on frequent dynamic memory allocation
+- Buddy Allocation algorithm for buffer management:
+  - Leveraging DirectByteBuffer for zero-copy I/O
+  - Reducing both GC overhead and OS overhead on frequent dynamic memory allocation
+  - Using array-based complete binary tree for efficient usage management
   - O(h) allocation and deallocation complexity (where h is the height of the tree, equal to log₂(maxBlockSize/minBlockSize))
-  - Using array-based complete binary tree for efficient memory block management
 - Graceful shutdown
 - Swiss table data structure
 - Bazel build system for simplified development environment

@@ -2,6 +2,7 @@ package app
 
 import app.config.Config
 import app.server.Server
+import com.google.common.base.Preconditions
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.Option
 import org.apache.commons.cli.Options
@@ -20,14 +21,13 @@ object MainApp {
       return
     }
     val config = configResult.getOrNull()!!
-    val (_, port, workerNum, selectorNum) = config
     LOG.info("Application pid: {}", ProcessHandle.current().pid())
-    LOG.info("Setting up {} worker(s), {} selector(s)", workerNum, selectorNum)
+    LOG.info("Applying config: {}", config)
     val server = Server(config)
 
-    LOG.info("Starting server on {}", port)
+    LOG.info("Starting server on {}", config.port)
     server.start()
-    LOG.info("Server is started on {}", port)
+    LOG.info("Server is started on {}", config.port)
 
     Thread.setDefaultUncaughtExceptionHandler { thread, exception ->
       LOG.error("Uncaught exception in thread {}", thread.name, exception)
@@ -57,7 +57,7 @@ object MainApp {
         .longOpt("server_name")
         .hasArg()
         .argName("SERVER_NAME")
-        .required(true)
+        .required(false)
         .build()
     )
 
@@ -66,7 +66,7 @@ object MainApp {
         .longOpt("worker_num")
         .hasArg()
         .argName("WORKER_NUM")
-        .required(true)
+        .required(false)
         .type(Number::class.java)
         .build()
     )
@@ -76,8 +76,52 @@ object MainApp {
         .longOpt("selector_num")
         .hasArg()
         .argName("SELECTOR_NUM")
-        .required(true)
+        .required(false)
         .type(Number::class.java)
+        .build()
+    )
+
+    options.addOption(
+      Option.builder("ic")
+        .longOpt("initial_capacity")
+        .hasArg()
+        .argName("INITIAL_CAPACITY")
+        .required(false)
+        .type(Number::class.java)
+        .desc("Initial capacity for hash maps")
+        .build()
+    )
+
+    options.addOption(
+      Option.builder("lf")
+        .longOpt("load_factor")
+        .hasArg()
+        .argName("LOAD_FACTOR")
+        .required(false)
+        .type(Number::class.java)
+        .desc("Load factor for hash maps")
+        .build()
+    )
+
+    options.addOption(
+      Option.builder("minbs")
+        .longOpt("min_block_size")
+        .hasArg()
+        .argName("MIN_BLOCK_SIZE")
+        .required(false)
+        .type(Number::class.java)
+        .desc("Minimum block size for memory allocator")
+        .build()
+    )
+
+    options.addOption(
+      Option.builder("maxbs")
+        .longOpt("max_block_size")
+        .hasArg()
+        .argName("MAX_BLOCK_SIZE")
+        .required(false)
+        .type(Number::class.java)
+        .desc("Maximum block size for memory allocator")
         .build()
     )
 
@@ -85,31 +129,44 @@ object MainApp {
       val parser = DefaultParser()
       val cmd = parser.parse(options, args)
       val port = cmd.getOptionValue("p").toInt()
-      val appName = cmd.getOptionValue("n")
-      val workerNum = cmd.getOptionValue("w").toInt()
-      val selectorNum = cmd.getOptionValue("s").toInt()
-      if (port < 0 || port > 65535) {
-        throw IllegalArgumentException("Port number must be between 0 and 65535")
-      }
-      if (workerNum <= 0) {
-        throw IllegalArgumentException("Worker number must be greater than 0")
-      }
-      if (appName.isBlank()) {
-        throw IllegalArgumentException("Server name cannot be empty")
-      }
-      if (selectorNum <= 0) {
-        throw IllegalArgumentException("Selector number must be greater than 0")
-      }
+      val appName = cmd.getOptionValue("n") ?: "simplekv"
+      val workerNum = cmd.getOptionValue("w")?.toInt() ?: 1
+      val selectorNum = cmd.getOptionValue("s")?.toInt() ?: 1
+      val initialCapacity = cmd.getOptionValue("ic")?.toInt() ?: 1024
+      val loadFactor = cmd.getOptionValue("lf")?.toFloat() ?: 0.75f
+      val minBlockSize = cmd.getOptionValue("minbs")?.toInt() ?: 256
+      val maxBlockSize = cmd.getOptionValue("maxbs")?.toInt() ?: 16777216
+      Preconditions.checkArgument(port in 0..65535, "Port number must be between 0 and 65535")
+      Preconditions.checkArgument(workerNum > 0, "Worker number must be greater than 0")
+      Preconditions.checkArgument(appName.isNotBlank(), "Server name cannot be empty")
+      Preconditions.checkArgument(selectorNum > 0, "Selector number must be greater than 0")
+      Preconditions.checkArgument(initialCapacity > 0, "Initial capacity must be greater than 0")
+      Preconditions.checkArgument(loadFactor > 0, "Load factor must be greater than 0")
+      Preconditions.checkArgument(minBlockSize > 0, "Minimum block size must be greater than 0")
+      Preconditions.checkArgument(maxBlockSize > 0, "Maximum block size must be greater than 0")
+      Preconditions.checkArgument(minBlockSize < maxBlockSize, "Minimum block size must be less than maximum block size")
+      Preconditions.checkArgument(maxBlockSize % minBlockSize == 0, "Maximum block size must be a multiple of minimum block size")
+      Preconditions.checkArgument(isPowerOfTwo(minBlockSize), "Minimum block size must be a power of 2")
+      Preconditions.checkArgument(isPowerOfTwo(maxBlockSize), "Maximum block size must be a power of 2")
+
       val config = Config(
         appName = appName,
         port = port,
         workerNum = workerNum,
-        selectorNum = selectorNum
+        selectorNum = selectorNum,
+        initialCapacity = initialCapacity,
+        loadFactor = loadFactor,
+        minBlockSize = minBlockSize,
+        maxBlockSize = maxBlockSize
       )
       return Result.success(config)
     } catch (e: Exception) {
       LOG.error("Error parsing command line arguments", e)
       return Result.failure(e)
     }
+  }
+
+  private fun isPowerOfTwo(n: Int): Boolean {
+    return n > 0 && (n and (n - 1)) == 0
   }
 }
