@@ -3,7 +3,7 @@ package app.handler
 import app.allocator.MemoryAllocator
 import app.config.Config
 import app.core.Event
-import app.datastructure.KeyValueStore
+import app.dashtable.KeyValueStore
 import java.nio.charset.StandardCharsets
 
 class MainHandler: Handler {
@@ -13,7 +13,7 @@ class MainHandler: Handler {
 
   constructor(config: Config) {
     this.config = config
-    val keyValueStore = KeyValueStore(config.initialCapacity, config.loadFactor)
+    val keyValueStore = KeyValueStore(config.segmentSize, config.regularSize, config.slotSize)
     val memoryAllocator = MemoryAllocator(config.minBlockSize, config.maxBlockSize)
     val appendPrependProcessor = AppendPrependProcessor(keyValueStore, memoryAllocator)
     val deleteProcessor = DeleteProcessor(keyValueStore, memoryAllocator)

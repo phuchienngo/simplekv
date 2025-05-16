@@ -5,7 +5,7 @@ import app.allocator.MemoryBlock
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
-import app.datastructure.KeyValueStore
+import app.dashtable.KeyValueStore
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
@@ -32,7 +32,7 @@ class IncrementDecrementProcessor(
     val key = decodeKey(event.body.key!!)
     val isKeyExists = keyValueStore.valueMap.containsKey(key)
 
-    if (isKeyExists && event.header.cas != 0L && event.header.cas != keyValueStore.casMap[key]) {
+    if (isKeyExists && event.header.cas != 0L && event.header.cas != keyValueStore.casMap.get(key)) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
@@ -50,7 +50,7 @@ class IncrementDecrementProcessor(
       return
     }
 
-    val currentValue = parseStringValue(keyValueStore.valueMap[key]!!.buffer)
+    val currentValue = parseStringValue(keyValueStore.valueMap.get(key)!!.buffer)
     val newValue = when (command) {
       CommandOpCodes.INCREMENT,
       CommandOpCodes.INCREMENTQ -> currentValue + delta
@@ -75,16 +75,16 @@ class IncrementDecrementProcessor(
   }
 
   private fun applyAndResponse(key: String, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes) {
-    keyValueStore.extrasMap[key]?.let(memoryAllocator::freeBlock)
-    keyValueStore.valueMap[key]?.let(memoryAllocator::freeBlock)
-    keyValueStore.valueMap[key] = createCounterValueBuffer(newValue)
-    keyValueStore.casMap[key] = cas
-    keyValueStore.extrasMap[key] = event.body.extras?.let {
+    keyValueStore.extrasMap.get(key)?.let(memoryAllocator::freeBlock)
+    keyValueStore.valueMap.get(key)?.let(memoryAllocator::freeBlock)
+    keyValueStore.valueMap.put(key, createCounterValueBuffer(newValue))
+    keyValueStore.casMap.put(key, cas)
+    keyValueStore.extrasMap.put(key, event.body.extras?.let {
       return@let memoryAllocator.allocateBlock(it.remaining()).apply {
         buffer.put(it.duplicate())
         buffer.flip()
       }
-    }
+    })
     if (Commands.isQuietCommand(command)) {
       event.done()
     } else {

@@ -5,7 +5,7 @@ import app.allocator.MemoryBlock
 import app.core.CommandOpCodes
 import app.core.ErrorCode
 import app.core.Event
-import app.datastructure.KeyValueStore
+import app.dashtable.KeyValueStore
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
@@ -33,14 +33,14 @@ class AppendPrependProcessor(
       return
     }
 
-    val currentCas = keyValueStore.casMap[key]
+    val currentCas = keyValueStore.casMap.get(key)
     if (event.header.cas != 0L && event.header.cas != currentCas) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }
 
-    val existingValue = keyValueStore.valueMap[key]!!
+    val existingValue = keyValueStore.valueMap.get(key)!!
     val appendValue = MemoryBlock(
       event.body.value!!,
       0
@@ -54,8 +54,8 @@ class AppendPrependProcessor(
     }
 
     val now = System.currentTimeMillis()
-    keyValueStore.valueMap[key] = newValue
-    keyValueStore.casMap[key] = now
+    keyValueStore.valueMap.put(key, newValue)
+    keyValueStore.casMap.put(key, now)
     memoryAllocator.freeBlock(existingValue)
     if (Commands.isQuietCommand(command)) {
       event.done()

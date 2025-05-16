@@ -3,7 +3,7 @@ package app.handler
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
-import app.datastructure.KeyValueStore
+import app.dashtable.KeyValueStore
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
@@ -30,9 +30,9 @@ class GetProcessor(
       return
     }
 
-    val value = keyValueStore.valueMap[key]
-    val extras = keyValueStore.extrasMap[key]
-    val cas = keyValueStore.casMap[key]!!
+    val value = keyValueStore.valueMap.get(key)
+    val extras = keyValueStore.extrasMap.get(key)
+    val cas = keyValueStore.casMap.get(key) ?: 0L
     val response = Responses.makeResponse(
       event.responseBuffer,
       event.header,

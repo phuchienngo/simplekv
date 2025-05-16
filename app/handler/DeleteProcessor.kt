@@ -4,7 +4,7 @@ import app.allocator.MemoryAllocator
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
-import app.datastructure.KeyValueStore
+import app.dashtable.KeyValueStore
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
@@ -32,7 +32,7 @@ class DeleteProcessor(
       return
     }
 
-    val currentCas = keyValueStore.casMap[key]
+    val currentCas = keyValueStore.casMap.get(key)
     val requestCas = event.header.cas
     if (requestCas != 0L && requestCas != currentCas) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)

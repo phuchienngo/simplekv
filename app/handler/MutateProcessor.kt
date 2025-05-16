@@ -4,7 +4,7 @@ import app.allocator.MemoryAllocator
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
-import app.datastructure.KeyValueStore
+import app.dashtable.KeyValueStore
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
@@ -57,21 +57,21 @@ class MutateProcessor(
   }
 
   private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteBuffer?, extras: ByteBuffer?, cas: Long) {
-    keyValueStore.valueMap[key]?.let(memoryAllocator::freeBlock)
-    keyValueStore.extrasMap[key]?.let(memoryAllocator::freeBlock)
-    keyValueStore.valueMap[key] = value?.let {
+    keyValueStore.valueMap.get(key)?.let(memoryAllocator::freeBlock)
+    keyValueStore.extrasMap.get(key)?.let(memoryAllocator::freeBlock)
+    keyValueStore.valueMap.put(key, value?.let {
       return@let memoryAllocator.allocateBlock(it.remaining()).apply {
         buffer.put(it.duplicate())
         buffer.flip()
       }
-    }
-    keyValueStore.extrasMap[key] = extras?.let {
+    })
+    keyValueStore.extrasMap.put(key, extras?.let {
       return@let memoryAllocator.allocateBlock(it.remaining()).apply {
         buffer.put(it.duplicate())
         buffer.flip()
       }
-    }
-    keyValueStore.casMap[key] = cas
+    })
+    keyValueStore.casMap.put(key, cas)
     if (Commands.isQuietCommand(command)) {
       event.done()
     } else {

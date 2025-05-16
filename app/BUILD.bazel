@@ -1,14 +1,4 @@
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_binary")
-load("@rules_java//java:defs.bzl", "java_library")
-
-java_library(
-    name = "data_structure_java_lib",
-    srcs = glob(["datastructure/SwissMap.java"]),
-    visibility = ["//visibility:public"],
-    deps = [
-        "@maven//:org_jetbrains_annotations",
-    ],
-)
 
 kt_jvm_binary(
     name = "main_app",
@@ -23,7 +13,12 @@ kt_jvm_binary(
         "core/ErrorCode.kt",
         "core/Event.kt",
         "core/Header.kt",
-        "datastructure/KeyValueStore.kt",
+        "dashtable/Bucket.kt",
+        "dashtable/DashTable.kt",
+        "dashtable/Entry.kt",
+        "dashtable/KeyValueStore.kt",
+        "dashtable/Segment.kt",
+        "dashtable/SegmentDirectory.kt",
         "handler/AppendPrependProcessor.kt",
         "handler/BaseProcessor.kt",
         "handler/DeleteProcessor.kt",
@@ -44,17 +39,8 @@ kt_jvm_binary(
         "utils/Responses.kt",
         "utils/Validators.kt",
     ],
-    jvm_flags = [
-        "-Xms1G",
-        "-Xmx4G",
-        "-XX:+UseZGC",
-        "-XX:+ZGenerational",
-        "-XX:InitiatingHeapOccupancyPercent=70",
-        "-XX:SoftMaxHeapSize=1G",
-    ],
     main_class = "app.MainApp",
     deps = [
-        "//app:data_structure_java_lib",
         "@maven//:com_google_guava_guava",
         "@maven//:com_lmax_disruptor",
         "@maven//:commons_cli_commons_cli",

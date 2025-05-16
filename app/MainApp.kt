@@ -82,28 +82,6 @@ object MainApp {
     )
 
     options.addOption(
-      Option.builder("ic")
-        .longOpt("initial_capacity")
-        .hasArg()
-        .argName("INITIAL_CAPACITY")
-        .required(false)
-        .type(Number::class.java)
-        .desc("Initial capacity for hash maps")
-        .build()
-    )
-
-    options.addOption(
-      Option.builder("lf")
-        .longOpt("load_factor")
-        .hasArg()
-        .argName("LOAD_FACTOR")
-        .required(false)
-        .type(Number::class.java)
-        .desc("Load factor for hash maps")
-        .build()
-    )
-
-    options.addOption(
       Option.builder("minbs")
         .longOpt("min_block_size")
         .hasArg()
@@ -125,6 +103,39 @@ object MainApp {
         .build()
     )
 
+    options.addOption(
+      Option.builder("ss")
+        .longOpt("segment_size")
+        .hasArg()
+        .argName("SEGMENT_SIZE")
+        .required(false)
+        .type(Number::class.java)
+        .desc("Size of segments for DashTable")
+        .build()
+    )
+
+    options.addOption(
+      Option.builder("rs")
+        .longOpt("regular_size")
+        .hasArg()
+        .argName("REGULAR_SIZE")
+        .required(false)
+        .type(Number::class.java)
+        .desc("Regular size for DashTable segments")
+        .build()
+    )
+
+    options.addOption(
+      Option.builder("sls")
+        .longOpt("slot_size")
+        .hasArg()
+        .argName("SLOT_SIZE")
+        .required(false)
+        .type(Number::class.java)
+        .desc("Size of slots in buckets")
+        .build()
+    )
+
     try {
       val parser = DefaultParser()
       val cmd = parser.parse(options, args)
@@ -132,32 +143,36 @@ object MainApp {
       val appName = cmd.getOptionValue("n") ?: "simplekv"
       val workerNum = cmd.getOptionValue("w")?.toInt() ?: 1
       val selectorNum = cmd.getOptionValue("s")?.toInt() ?: 1
-      val initialCapacity = cmd.getOptionValue("ic")?.toInt() ?: 1024
-      val loadFactor = cmd.getOptionValue("lf")?.toFloat() ?: 0.75f
       val minBlockSize = cmd.getOptionValue("minbs")?.toInt() ?: 256
       val maxBlockSize = cmd.getOptionValue("maxbs")?.toInt() ?: 16777216
+      val segmentSize = cmd.getOptionValue("ss")?.toInt() ?: 60
+      val regularSize = cmd.getOptionValue("rs")?.toInt() ?: 54
+      val slotSize = cmd.getOptionValue("sls")?.toInt() ?: 14
       Preconditions.checkArgument(port in 0..65535, "Port number must be between 0 and 65535")
       Preconditions.checkArgument(workerNum > 0, "Worker number must be greater than 0")
       Preconditions.checkArgument(appName.isNotBlank(), "Server name cannot be empty")
       Preconditions.checkArgument(selectorNum > 0, "Selector number must be greater than 0")
-      Preconditions.checkArgument(initialCapacity > 0, "Initial capacity must be greater than 0")
-      Preconditions.checkArgument(loadFactor > 0, "Load factor must be greater than 0")
       Preconditions.checkArgument(minBlockSize > 0, "Minimum block size must be greater than 0")
       Preconditions.checkArgument(maxBlockSize > 0, "Maximum block size must be greater than 0")
       Preconditions.checkArgument(minBlockSize < maxBlockSize, "Minimum block size must be less than maximum block size")
       Preconditions.checkArgument(maxBlockSize % minBlockSize == 0, "Maximum block size must be a multiple of minimum block size")
       Preconditions.checkArgument(isPowerOfTwo(minBlockSize), "Minimum block size must be a power of 2")
       Preconditions.checkArgument(isPowerOfTwo(maxBlockSize), "Maximum block size must be a power of 2")
+      Preconditions.checkArgument(segmentSize > 0, "Segment size must be greater than 0")
+      Preconditions.checkArgument(regularSize > 0, "Regular size must be greater than 0")
+      Preconditions.checkArgument(slotSize > 0, "Slot size must be greater than 0")
+      Preconditions.checkArgument(regularSize < segmentSize, "Regular size must be less than segment size")
 
       val config = Config(
         appName = appName,
         port = port,
         workerNum = workerNum,
         selectorNum = selectorNum,
-        initialCapacity = initialCapacity,
-        loadFactor = loadFactor,
         minBlockSize = minBlockSize,
-        maxBlockSize = maxBlockSize
+        maxBlockSize = maxBlockSize,
+        segmentSize = segmentSize,
+        regularSize = regularSize,
+        slotSize = slotSize,
       )
       return Result.success(config)
     } catch (e: Exception) {
