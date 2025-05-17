@@ -1,7 +1,7 @@
 # Simple in-memory key-value database
 ## How to run
 - Install [Bazelisk](https://bazel.build/install/bazelisk)
-- Run: `bazel run //app:main_app -- -p 11211 -n simplekv -w 2 -s 4`
+- Run: `bazel run //app:main_app -- -p 11211`
 ### Configuration Options
 - `-p`, `--port`: Port number (required)
 - `-n`, `--name`: Server name (default: "simplekv")
@@ -20,11 +20,11 @@
 - Buddy Allocation algorithm for buffer management:
   - Leveraging DirectByteBuffer for zero-copy I/O
   - Reducing both GC overhead and OS overhead on frequent dynamic memory allocation
-  - Using array-based complete binary tree for efficient usage management
-  - O(h) allocation and deallocation complexity (where h is the height of the tree, equal to log₂(maxBlockSize/minBlockSize))
+  - Using array-based full binary tree for efficient usage management
+  - O(h) allocation and deallocation complexity (where h is the height of the binary tree, equal to log₂(maxBlockSize/minBlockSize))
 - Graceful shutdown
 - [DashTable](https://github.com/dragonflydb/dragonfly/blob/main/docs/dashtable.md) data structure
-  - Applying [Extendible hashing](https://en.wikipedia.org/wiki/Extendible_hashing) to minimize rehashing cost
+  - Applying [Extendible hashing](https://en.wikipedia.org/wiki/Extendible_hashing) to eliminate full-table rehashing during growth operations
 - Bazel build system for simplified development environment
 - Commands:
     - NO_OP, VERSION
@@ -48,12 +48,22 @@
   - Network: 10Gbps
 ### Server Configuration
 - JVM: OpenJDK 21
-- JVM Argument: `-Xms4G -Xmx16G -XX:+UseZGC -XX:+ZGenerational -XX:InitiatingHeapOccupancyPercent=70 -XX:SoftMaxHeapSize=12G -XX:MaxDirectMemorySize=32G`
 - Workers: 2 threads
 - Selectors: 4 threads
+- Test command:
+  ```bash
+      bazel run //app:main_app \
+      --jvmopt="-Xms4G" \
+      --jvmopt="-Xmx16G" \
+      --jvmopt="-XX:+UseZGC" \
+      --jvmopt="-XX:+ZGenerational" \
+      --jvmopt="-XX:InitiatingHeapOccupancyPercent=70" \
+      --jvmopt="-XX:SoftMaxHeapSize=12G" \
+      --jvmopt="-XX:MaxDirectMemorySize=32G" \
+      -- -p 11211 -n simplekv -w 2 -s 4
 ### Client Configuration
-- Tool: memtier_benchmark
-- Test:
+- Tool: [memtier_benchmark](https://github.com/RedisLabs/memtier_benchmark)
+- Test command:
   - SET: `memtier_benchmark -h 10.128.0.7 -p 11211 --protocol=memcache_binary -c 20 --test-time 60 -t 8 -d 256 --distinct-client-seed --ratio 1:0`
   - GET: `memtier_benchmark -h 10.128.0.7 -p 11211 --protocol=memcache_binary -c 20 --test-time 60 -t 8 -d 256 --distinct-client-seed --ratio 0:1`
   - Mixed: `memtier_benchmark -h 10.128.0.7 -p 11211 --protocol=memcache_binary -c 20 --test-time 60 -t 8 -d 256 --distinct-client-seed --ratio 3:10`
