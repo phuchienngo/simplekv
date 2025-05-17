@@ -7,6 +7,7 @@ import com.lmax.disruptor.Sequence
 import com.lmax.disruptor.Sequencer
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.io.Closeable
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
 import java.nio.channels.spi.SelectorProvider
@@ -18,7 +19,7 @@ class SelectorThread(
   private val server: Server,
   private val workers: List<Worker>,
   index: Int,
-): Thread("${config.appName}-SelectorThread-$index") {
+): Thread("${config.appName}-SelectorThread-$index"), Closeable {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(SelectorThread::class.java)
   }
@@ -73,14 +74,14 @@ class SelectorThread(
     } catch (e: Exception) {
       LOG.error("Error closing selector", e)
     }
-    server.stop()
+    server.close()
   }
 
   fun wakeup() {
     selector.wakeup()
   }
 
-  fun stopRunning() {
+  override fun close() {
     wakeup()
     isRunning.set(false)
   }

@@ -3,6 +3,7 @@ package app.server
 import app.config.Config
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.io.Closeable
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
 import java.nio.channels.ServerSocketChannel
@@ -10,7 +11,7 @@ import java.nio.channels.spi.SelectorProvider
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
-class AcceptorThread: Thread {
+class AcceptorThread: Thread, Closeable {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(AcceptorThread::class.java)
   }
@@ -49,7 +50,7 @@ class AcceptorThread: Thread {
     for (selectorThread in selectorThreads) {
       selectorThread.wakeup()
     }
-    server.stop()
+    server.close()
   }
 
   private fun select() {
@@ -89,7 +90,7 @@ class AcceptorThread: Thread {
     acceptSelector.wakeup()
   }
 
-  fun stopRunning() {
+  override fun close() {
     wakeup()
     isRunning.set(false)
   }

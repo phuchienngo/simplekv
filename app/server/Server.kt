@@ -2,11 +2,12 @@ package app.server
 
 import app.config.Config
 import app.handler.MainHandler
+import java.io.Closeable
 import java.net.InetSocketAddress
 import java.nio.channels.ServerSocketChannel
 import java.util.concurrent.atomic.AtomicBoolean
 
-class Server(private val config: Config) {
+class Server(private val config: Config): Closeable {
   private val isRunning = AtomicBoolean(false)
   private val serverChannel: ServerSocketChannel = ServerSocketChannel.open()
   private val acceptor: AcceptorThread
@@ -56,16 +57,16 @@ class Server(private val config: Config) {
     acceptor.start()
   }
 
-  fun stop() {
+  override fun close() {
     if (!isRunning.compareAndSet(true, false)) {
       return
     }
-    acceptor.stopRunning()
+    acceptor.close()
     for (worker in workers) {
       worker.stopRunning()
     }
     for (selectorThread in selectors) {
-      selectorThread.stopRunning()
+      selectorThread.close()
     }
     serverChannel.close()
     Thread.sleep(200)
