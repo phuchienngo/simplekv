@@ -21,10 +21,11 @@
   - Leveraging DirectByteBuffer for zero-copy I/O
   - Reducing both GC overhead and OS overhead on frequent dynamic memory allocation
   - Using array-based full binary tree for efficient usage management
-  - O(h) allocation and deallocation complexity (where h is the height of the binary tree, equal to log₂(maxBlockSize/minBlockSize))
+  - O(log₂(n)) allocation and deallocation complexity where n = maxBlockSize/minBlockSize
 - Graceful shutdown
 - [DashTable](https://github.com/dragonflydb/dragonfly/blob/main/docs/dashtable.md) data structure
-  - Applying [Extendible hashing](https://en.wikipedia.org/wiki/Extendible_hashing) to eliminate full-table rehashing during growth operations
+  - Space-efficient trie data structure using contiguous arrays
+  - Eliminating full-table rehashing when growing with [Extendible hashing](https://en.wikipedia.org/wiki/Extendible_hashing)
 - Bazel build system for simplified development environment
 - Commands:
     - NO_OP, VERSION

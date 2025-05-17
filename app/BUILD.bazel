@@ -41,11 +41,11 @@ kt_jvm_binary(
     ],
     main_class = "app.MainApp",
     deps = [
-        "@maven//:com_google_guava_guava",
-        "@maven//:com_lmax_disruptor",
-        "@maven//:commons_cli_commons_cli",
-        "@maven//:org_jetbrains_kotlin_kotlin_stdlib",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:org_slf4j_slf4j_simple",
+        "@main//:com_google_guava_guava",
+        "@main//:com_lmax_disruptor",
+        "@main//:commons_cli_commons_cli",
+        "@main//:org_jetbrains_kotlin_kotlin_stdlib",
+        "@main//:org_slf4j_slf4j_api",
+        "@main//:org_slf4j_slf4j_simple",
     ],
 )
