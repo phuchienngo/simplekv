@@ -3,13 +3,13 @@ package app.handler
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
-import app.dashtable.KeyValueStore
+import app.dashtable.DashTable
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
 
 class GetProcessor(
-  private val keyValueStore: KeyValueStore
+  private val dashTable: DashTable<CacheEntry>
 ): BaseProcessor() {
   @Suppress("DuplicatedCode")
   override fun process(event: Event, command: CommandOpCodes) {
@@ -20,7 +20,8 @@ class GetProcessor(
     }
 
     val key = decodeKey(event.body.key!!)
-    if (!keyValueStore.valueMap.containsKey(key)) {
+    val cacheEntry = dashTable.get(key)
+    if (cacheEntry == null) {
       if (Commands.isQuietCommand(command)) {
         event.done()
       } else {
@@ -30,9 +31,9 @@ class GetProcessor(
       return
     }
 
-    val value = keyValueStore.valueMap.get(key)
-    val extras = keyValueStore.extrasMap.get(key)
-    val cas = keyValueStore.casMap.get(key) ?: 0L
+    val value = cacheEntry.value
+    val extras = cacheEntry.extra
+    val cas = cacheEntry.cas ?: 0L
     val response = Responses.makeResponse(
       event.responseBuffer,
       event.header,

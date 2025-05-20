@@ -3,7 +3,7 @@ package app.handler
 import app.allocator.MemoryAllocator
 import app.config.Config
 import app.core.Event
-import app.dashtable.KeyValueStore
+import app.dashtable.DashTable
 import java.nio.charset.StandardCharsets
 
 class MainHandler: Handler {
@@ -13,13 +13,13 @@ class MainHandler: Handler {
 
   constructor(config: Config) {
     this.config = config
-    val keyValueStore = KeyValueStore(config.segmentSize, config.regularSize, config.slotSize)
+    val dashTable = DashTable<CacheEntry>(config.segmentSize, config.regularSize, config.slotSize)
     val memoryAllocator = MemoryAllocator(config.minBlockSize, config.maxBlockSize)
-    val appendPrependProcessor = AppendPrependProcessor(keyValueStore, memoryAllocator)
-    val deleteProcessor = DeleteProcessor(keyValueStore, memoryAllocator)
-    val getProcessor = GetProcessor(keyValueStore)
-    val incrementDecrementProcessor = IncrementDecrementProcessor(keyValueStore, memoryAllocator)
-    val mutateProcessor = MutateProcessor(keyValueStore, memoryAllocator)
+    val appendPrependProcessor = AppendPrependProcessor(dashTable, memoryAllocator)
+    val deleteProcessor = DeleteProcessor(dashTable, memoryAllocator)
+    val getProcessor = GetProcessor(dashTable)
+    val incrementDecrementProcessor = IncrementDecrementProcessor(dashTable, memoryAllocator)
+    val mutateProcessor = MutateProcessor(dashTable, memoryAllocator)
     notNullKeyProcessor = NotNullKeyProcessor(
       appendPrependProcessor,
       deleteProcessor,

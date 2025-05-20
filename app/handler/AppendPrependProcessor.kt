@@ -5,13 +5,13 @@ import app.allocator.MemoryBlock
 import app.core.CommandOpCodes
 import app.core.ErrorCode
 import app.core.Event
-import app.dashtable.KeyValueStore
+import app.dashtable.DashTable
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
 
 class AppendPrependProcessor(
-  private val keyValueStore: KeyValueStore,
+  private val dashTable: DashTable<CacheEntry>,
   private val memoryAllocator: MemoryAllocator
 ): BaseProcessor() {
   @Suppress("DuplicatedCode")
@@ -23,7 +23,8 @@ class AppendPrependProcessor(
     }
 
     val key = decodeKey(event.body.key!!)
-    if (!keyValueStore.valueMap.containsKey(key)) {
+    val cacheEntry = dashTable.get(key)
+    if (cacheEntry == null) {
       if (Commands.isQuietCommand(command)) {
         event.done()
       } else {
@@ -33,14 +34,15 @@ class AppendPrependProcessor(
       return
     }
 
-    val currentCas = keyValueStore.casMap.get(key)
+
+    val currentCas = cacheEntry.cas
     if (event.header.cas != 0L && event.header.cas != currentCas) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }
 
-    val existingValue = keyValueStore.valueMap.get(key)!!
+    val existingValue = cacheEntry.value!!
     val appendValue = MemoryBlock(
       event.body.value!!,
       0
@@ -54,8 +56,8 @@ class AppendPrependProcessor(
     }
 
     val now = System.currentTimeMillis()
-    keyValueStore.valueMap.put(key, newValue)
-    keyValueStore.casMap.put(key, now)
+    cacheEntry.value = newValue
+    cacheEntry.cas = now
     memoryAllocator.freeBlock(existingValue)
     if (Commands.isQuietCommand(command)) {
       event.done()

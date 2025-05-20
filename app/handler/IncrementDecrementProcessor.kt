@@ -5,7 +5,7 @@ import app.allocator.MemoryBlock
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
-import app.dashtable.KeyValueStore
+import app.dashtable.DashTable
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
@@ -13,7 +13,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 class IncrementDecrementProcessor(
-  private val keyValueStore: KeyValueStore,
+  private val dashTable: DashTable<CacheEntry>,
   private val memoryAllocator: MemoryAllocator
 ): BaseProcessor() {
   override fun process(event: Event, command: CommandOpCodes) {
@@ -30,33 +30,33 @@ class IncrementDecrementProcessor(
     extras.position(0)
 
     val key = decodeKey(event.body.key!!)
-    val isKeyExists = keyValueStore.valueMap.containsKey(key)
+    val cacheEntry = dashTable.get(key)
 
-    if (isKeyExists && event.header.cas != 0L && event.header.cas != keyValueStore.casMap.get(key)) {
+    if (cacheEntry != null && event.header.cas != 0L && event.header.cas != cacheEntry.cas) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
       event.reply(response)
       return
     }
 
     val now = System.currentTimeMillis()
-    if (!isKeyExists) {
+    if (cacheEntry == null) {
       if (expiration == 0xFFFFFFFF.toInt()) {
         val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyNotFound)
         event.reply(response)
         return
       }
 
-      applyAndResponse(key, initialValue, now, event, command)
+      applyAndResponse(key, initialValue, now, event, command, CacheEntry(null, null, null))
       return
     }
 
-    val currentValue = parseStringValue(keyValueStore.valueMap.get(key)!!.buffer)
+    val currentValue = parseStringValue(cacheEntry.value!!.buffer)
     val newValue = when (command) {
       CommandOpCodes.INCREMENT,
       CommandOpCodes.INCREMENTQ -> currentValue + delta
       else -> if (delta > currentValue) 0UL else currentValue - delta
     }
-    applyAndResponse(key, newValue, now, event, command)
+    applyAndResponse(key, newValue, now, event, command, cacheEntry)
   }
 
   private fun parseStringValue(buffer: ByteBuffer): ULong {
@@ -74,17 +74,18 @@ class IncrementDecrementProcessor(
     }
   }
 
-  private fun applyAndResponse(key: String, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes) {
-    keyValueStore.extrasMap.get(key)?.let(memoryAllocator::freeBlock)
-    keyValueStore.valueMap.get(key)?.let(memoryAllocator::freeBlock)
-    keyValueStore.valueMap.put(key, createCounterValueBuffer(newValue))
-    keyValueStore.casMap.put(key, cas)
-    keyValueStore.extrasMap.put(key, event.body.extras?.let {
+  private fun applyAndResponse(key: String, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes, cacheEntry: CacheEntry) {
+    cacheEntry.extra?.let(memoryAllocator::freeBlock)
+    cacheEntry.value?.let(memoryAllocator::freeBlock)
+    cacheEntry.value = createCounterValueBuffer(newValue)
+    cacheEntry.cas = cas
+    cacheEntry.extra = event.body.extras?.let {
       return@let memoryAllocator.allocateBlock(it.remaining()).apply {
         buffer.put(it.duplicate())
         buffer.flip()
       }
-    })
+    }
+    dashTable.put(key, cacheEntry)
     if (Commands.isQuietCommand(command)) {
       event.done()
     } else {

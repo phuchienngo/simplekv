@@ -4,13 +4,13 @@ import app.allocator.MemoryAllocator
 import app.core.CommandOpCodes
 import app.core.Event
 import app.core.ErrorCode
-import app.dashtable.KeyValueStore
+import app.dashtable.DashTable
 import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
 
 class DeleteProcessor(
-  private val keyValueStore: KeyValueStore,
+  private val dashTable: DashTable<CacheEntry>,
   private val memoryAllocator: MemoryAllocator
 ): BaseProcessor() {
   @Suppress("DuplicatedCode")
@@ -22,7 +22,8 @@ class DeleteProcessor(
     }
 
     val key = decodeKey(event.body.key!!)
-    if (!keyValueStore.valueMap.containsKey(key)) {
+    val cacheEntry = dashTable.get(key)
+    if (cacheEntry == null) {
       if (Commands.isQuietCommand(command)) {
         event.done()
       } else {
@@ -32,7 +33,7 @@ class DeleteProcessor(
       return
     }
 
-    val currentCas = keyValueStore.casMap.get(key)
+    val currentCas = cacheEntry.cas
     val requestCas = event.header.cas
     if (requestCas != 0L && requestCas != currentCas) {
       val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyExists)
@@ -40,9 +41,9 @@ class DeleteProcessor(
       return
     }
 
-    keyValueStore.valueMap.remove(key)?.let(memoryAllocator::freeBlock)
-    keyValueStore.extrasMap.remove(key)?.let(memoryAllocator::freeBlock)
-    keyValueStore.casMap.remove(key)
+    cacheEntry.value?.let(memoryAllocator::freeBlock)
+    cacheEntry.extra?.let(memoryAllocator::freeBlock)
+    dashTable.remove(key)
     if (Commands.isQuietCommand(command)) {
       event.done()
       return
