@@ -9,10 +9,12 @@ import app.utils.Commands
 import app.utils.Responses
 import app.utils.Validators
 import java.nio.ByteBuffer
+import java.time.Clock
 
 class MutateProcessor(
   private val dashTable: DashTable<CacheEntry>,
-  private val memoryAllocator: MemoryAllocator
+  private val memoryAllocator: MemoryAllocator,
+  private val clock: Clock,
 ): BaseProcessor() {
   override fun process(event: Event, command: CommandOpCodes) {
     if (!Validators.hasExtras(event) || !Validators.hasKey(event)) {
@@ -36,9 +38,10 @@ class MutateProcessor(
       cacheEntry = CacheEntry(null, null, null)
     }
 
+    val ttl = extractTTLFromExtras(extras)
     when (command) {
       CommandOpCodes.SET, CommandOpCodes.SETQ -> {
-        addOrUpdateAndReply(command, event, key, value, extras, now, cacheEntry)
+        addOrUpdateAndReply(command, event, key, value, extras, now, ttl, cacheEntry)
       }
       CommandOpCodes.ADD, CommandOpCodes.ADDQ -> {
         if (dashTable.containsKey(key)) {
@@ -46,7 +49,7 @@ class MutateProcessor(
           event.reply(response)
           return
         }
-        addOrUpdateAndReply(command, event, key, value, extras, now, cacheEntry)
+        addOrUpdateAndReply(command, event, key, value, extras, now, ttl, cacheEntry)
       }
       CommandOpCodes.REPLACE, CommandOpCodes.REPLACEQ -> {
         if (!dashTable.containsKey(key)) {
@@ -54,13 +57,13 @@ class MutateProcessor(
           event.reply(response)
           return
         }
-        addOrUpdateAndReply(command, event, key, value, extras, now, cacheEntry)
+        addOrUpdateAndReply(command, event, key, value, extras, now, ttl, cacheEntry)
       }
       else -> {} // never reached
     }
   }
 
-  private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteBuffer?, extras: ByteBuffer?, cas: Long, cacheEntry: CacheEntry) {
+  private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteBuffer?, extras: ByteBuffer?, cas: Long, ttl: Int, cacheEntry: CacheEntry) {
     cacheEntry.value?.let(memoryAllocator::freeBlock)
     cacheEntry.extra?.let(memoryAllocator::freeBlock)
     cacheEntry.value = value?.let {
@@ -76,12 +79,29 @@ class MutateProcessor(
       }
     }
     cacheEntry.cas = cas
-    dashTable.put(key, cacheEntry)
+    val expirationTime = if (ttl > 0L) {
+      clock.millis() + ttl * 1000L
+    } else {
+      0L
+    }
+    dashTable.put(key, cacheEntry, expirationTime)
     if (Commands.isQuietCommand(command)) {
       event.done()
     } else {
       val response = Responses.makeResponse(event.responseBuffer, event.header, cas, null, null, null)
       event.reply(response)
     }
+  }
+
+  private fun extractTTLFromExtras(extras: ByteBuffer?): Int {
+    if (extras == null) {
+      return 0
+    }
+    val duplicated = extras.duplicate()
+    if (duplicated.remaining() < 8) {
+      return 0
+    }
+    duplicated.int // skip 4 bytes
+    return duplicated.int
   }
 }

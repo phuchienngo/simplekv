@@ -14,6 +14,7 @@
 - `-sls`, `--slot_size`: Size of slots in buckets in DashTable segments (default: 14)
 ## Features
 - [MemCached Binary Protocol](https://docs.memcached.org/protocols/binary/) support
+- Expiration
 - I/O Multiplexing
 - Key-based data partitioning with Consistent hashing for lock-free parallel processing
 - LMAX Disruptor for efficient thread communication
@@ -75,5 +76,5 @@
 | GET                | 728,575                   | 0.36             |
 | Mixed(1 SET/3 GET) | 573,537 (132,358/441,179) | 0.72 (0.73/0.71) |
 ## Todo
-- Expiration and eviction
+- Eviction
 - Write-ahead log

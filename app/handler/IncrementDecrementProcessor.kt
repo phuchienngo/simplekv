@@ -11,10 +11,12 @@ import app.utils.Responses
 import app.utils.Validators
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import java.time.Clock
 
 class IncrementDecrementProcessor(
   private val dashTable: DashTable<CacheEntry>,
-  private val memoryAllocator: MemoryAllocator
+  private val memoryAllocator: MemoryAllocator,
+  private val clock: Clock,
 ): BaseProcessor() {
   override fun process(event: Event, command: CommandOpCodes) {
     if (!Validators.hasExtras(event) || !Validators.hasKey(event) || Validators.hasValue(event)) {
@@ -26,7 +28,7 @@ class IncrementDecrementProcessor(
     val extras = event.body.extras!!
     val delta = extras.getLong().toULong()
     val initialValue = extras.getLong().toULong()
-    val expiration = extras.getInt()
+    val ttl = extras.getInt()
     extras.position(0)
 
     val key = decodeKey(event.body.key!!)
@@ -40,13 +42,13 @@ class IncrementDecrementProcessor(
 
     val now = System.currentTimeMillis()
     if (cacheEntry == null) {
-      if (expiration == 0xFFFFFFFF.toInt()) {
+      if (ttl == 0xFFFFFFFF.toInt()) {
         val response = Responses.makeError(event.responseBuffer, event.header, ErrorCode.KeyNotFound)
         event.reply(response)
         return
       }
 
-      applyAndResponse(key, initialValue, now, event, command, CacheEntry(null, null, null))
+      applyAndResponse(key, initialValue, now, event, command, ttl, CacheEntry(null, null, null))
       return
     }
 
@@ -56,7 +58,7 @@ class IncrementDecrementProcessor(
       CommandOpCodes.INCREMENTQ -> currentValue + delta
       else -> if (delta > currentValue) 0UL else currentValue - delta
     }
-    applyAndResponse(key, newValue, now, event, command, cacheEntry)
+    applyAndResponse(key, newValue, now, event, command, ttl, cacheEntry)
   }
 
   private fun parseStringValue(buffer: ByteBuffer): ULong {
@@ -74,7 +76,7 @@ class IncrementDecrementProcessor(
     }
   }
 
-  private fun applyAndResponse(key: String, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes, cacheEntry: CacheEntry) {
+  private fun applyAndResponse(key: String, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes, ttl: Int, cacheEntry: CacheEntry) {
     cacheEntry.extra?.let(memoryAllocator::freeBlock)
     cacheEntry.value?.let(memoryAllocator::freeBlock)
     cacheEntry.value = createCounterValueBuffer(newValue)
@@ -85,7 +87,12 @@ class IncrementDecrementProcessor(
         buffer.flip()
       }
     }
-    dashTable.put(key, cacheEntry)
+    val expirationTime = if (ttl > 0L) {
+      clock.millis() + ttl * 1000L
+    } else {
+      0L
+    }
+    dashTable.put(key, cacheEntry, expirationTime)
     if (Commands.isQuietCommand(command)) {
       event.done()
     } else {

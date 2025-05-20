@@ -23,40 +23,40 @@ class Segment<K, V>(
     return status
   }
 
-  fun get(key: K, hashCode: HashCode): Entry<K, V>? {
+  fun get(key: K, hashCode: HashCode, now: Long): Entry<K, V>? {
     if (status != SegmentStatus.IN_USED) {
       return null
     }
 
     val index = Hashing.consistentHash(hashCode, regularSize)
-    var result = buckets[index].get(key)
+    var result = buckets[index].get(key, now)
     if (result != null) {
       return result
     }
     if (index + 1 < regularSize) {
-      result = buckets[index + 1].get(key)
+      result = buckets[index + 1].get(key, now)
       if (result != null) {
         return result
       }
     }
     for (stashIndex in regularSize until segmentSize) {
-      result = buckets[stashIndex].get(key) ?: continue
+      result = buckets[stashIndex].get(key, now) ?: continue
       return result
     }
     return null
   }
 
-  fun put(key: K, value: V, hashCode: HashCode): Boolean {
+  fun put(key: K, value: V, hashCode: HashCode, expireTime: Long): Boolean {
     if (status != SegmentStatus.IN_USED) {
       return false
     }
 
     val index = Hashing.consistentHash(hashCode, regularSize)
-    if (buckets[index].put(key, value, hashCode) || index + 1 < regularSize && buckets[index + 1].put(key, value, hashCode)) {
+    if (buckets[index].put(key, value, hashCode, expireTime) || index + 1 < regularSize && buckets[index + 1].put(key, value, hashCode, expireTime)) {
       return true
     }
     for (stashIndex in regularSize until segmentSize) {
-      if (buckets[stashIndex].put(key, value, hashCode)) {
+      if (buckets[stashIndex].put(key, value, hashCode, expireTime)) {
         return true
       }
     }
@@ -90,5 +90,13 @@ class Segment<K, V>(
   fun obsolete(): Array<Bucket<K, V>> {
     status = SegmentStatus.OBSOLETED
     return buckets
+  }
+
+  fun cleanExpiredEntries(now: Long): Boolean {
+    var isSuccess = false
+    for (bucket in buckets) {
+      isSuccess = isSuccess || bucket.cleanExpiredItems(now)
+    }
+    return isSuccess
   }
 }

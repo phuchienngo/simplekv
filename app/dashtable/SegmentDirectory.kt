@@ -3,12 +3,14 @@ package app.dashtable
 import com.google.common.hash.HashCode
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.time.Clock
 import kotlin.math.pow
 
 class SegmentDirectory<K, V>(
   private val segmentSize: Int,
   private val regularSize: Int,
   private val slotSize: Int,
+  private val clock: Clock
 ) {
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(SegmentDirectory::class.java)
@@ -19,9 +21,10 @@ class SegmentDirectory<K, V>(
     return@Array segment
   }
 
-  fun put(key: K, value: V, hashCode: HashCode): Boolean {
+  fun put(key: K, value: V, hashCode: HashCode, expireTime: Long): Boolean {
     var bitIndex = -1
     var segmentIndex = 0
+    val now = clock.millis()
     while (bitIndex < hashCode.bits()
       && segmentIndex < segments.size
       && segments[segmentIndex].getStatus() != Segment.SegmentStatus.UNINITIALIZED
@@ -29,7 +32,10 @@ class SegmentDirectory<K, V>(
       val segment = segments[segmentIndex]
       when (segment.getStatus()) {
         Segment.SegmentStatus.IN_USED -> {
-          if (segment.put(key, value, hashCode)) {
+          if (segment.put(key, value, hashCode, expireTime)) {
+            return true
+          }
+          if (segment.cleanExpiredEntries(now) && segment.put(key, value, hashCode, expireTime)) {
             return true
           }
           splitSegment(segment, segmentIndex, bitIndex + 1)
@@ -53,13 +59,14 @@ class SegmentDirectory<K, V>(
   fun get(key: K, hashCode: HashCode): Entry<K, V>? {
     var bitIndex = -1
     var segmentIndex = 0
+    val now = clock.millis()
     while (bitIndex < hashCode.bits()
       && segmentIndex < segments.size
       && segments[segmentIndex].getStatus() != Segment.SegmentStatus.UNINITIALIZED
     ) {
       val segment = segments[segmentIndex]
       if (segment.getStatus() == Segment.SegmentStatus.IN_USED) {
-        return segment.get(key, hashCode)
+        return segment.get(key, hashCode, now)
       }
       segmentIndex = if (isBitSet(hashCode, ++bitIndex)) {
         2 * segmentIndex + 2
@@ -134,9 +141,9 @@ class SegmentDirectory<K, V>(
   private fun rehashing(bucket: Bucket<K, V>, bitIndex: Int, onBitSegment: Segment<K, V>, offBitSegment: Segment<K, V>) {
     for (entry in bucket.entries()) {
       if (isBitSet(entry.hashCode, bitIndex)) {
-        onBitSegment.put(entry.key, entry.value, entry.hashCode)
+        onBitSegment.put(entry.key, entry.value, entry.hashCode, entry.expireTime)
       } else {
-        offBitSegment.put(entry.key, entry.value, entry.hashCode)
+        offBitSegment.put(entry.key, entry.value, entry.hashCode, entry.expireTime)
       }
     }
     bucket.clear()

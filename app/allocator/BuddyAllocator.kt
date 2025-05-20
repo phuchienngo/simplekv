@@ -1,6 +1,5 @@
 package app.allocator
 
-import com.google.common.base.Preconditions
 import java.nio.ByteBuffer
 import kotlin.math.log2
 import kotlin.math.max
@@ -84,10 +83,6 @@ class BuddyAllocator {
       }
       blockIndex = (blockIndex - 1) shr 1
     }
-  }
-
-  private fun isPowerOfTwo(n: Int): Boolean {
-    return n > 0 && (n and (n - 1)) == 0
   }
 
   private fun nextPowerOfTwo(n: Int): Int {
