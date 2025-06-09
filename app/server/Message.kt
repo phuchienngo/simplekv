@@ -4,6 +4,7 @@ import app.core.Body
 import app.core.Header
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.SelectionKey
 import java.nio.channels.SocketChannel
@@ -83,11 +84,10 @@ class Message(
       try {
         while (buffer.hasRemaining()) {
           val bytesWritten = channelSocket.write(buffer)
-          if (bytesWritten == 0) {
-            return true
-          }
-          if (bytesWritten < 0) {
-            return false
+          return when {
+            bytesWritten > 0 -> continue
+            bytesWritten == 0 -> true
+            else -> false
           }
         }
         prepareRead()
@@ -171,17 +171,11 @@ class Message(
   }
 
   private fun internalRead(): Boolean {
-    try {
-      var totalBytesRead = 0
-      var bytesRead: Int
-      do {
-        bytesRead = channelSocket.read(buffer)
-        totalBytesRead += 0.coerceAtLeast(bytesRead)
-      } while (bytesRead > 0 && buffer.hasRemaining())
-      return totalBytesRead >= 0 || bytesRead >= 0
-    } catch (e: Exception) {
-      LOG.error("Encountered error while reading from channel", e)
-      return false
+    return try {
+      channelSocket.read(buffer) >= 0
+    } catch (e: IOException) {
+      LOG.error("IO error while reading from channel", e)
+      false
     }
   }
 
