@@ -53,7 +53,7 @@ object MainApp {
         .type(Int::class.java)
         .converter(String::toInt)
         .desc("Port number for the server")
-        .build()
+        .get()
     )
 
     options.addOption(
@@ -63,7 +63,7 @@ object MainApp {
         .argName("SERVER_NAME")
         .required(false)
         .desc("Name of the server")
-        .build()
+        .get()
     )
 
     options.addOption(
@@ -75,7 +75,7 @@ object MainApp {
         .type(Int::class.java)
         .converter(String::toInt)
         .desc("Number of worker threads")
-        .build()
+        .get()
     )
 
     options.addOption(
@@ -87,7 +87,7 @@ object MainApp {
         .type(Int::class.java)
         .converter(String::toInt)
         .desc("Number of selector threads")
-        .build()
+        .get()
     )
 
     options.addOption(
@@ -99,7 +99,7 @@ object MainApp {
         .type(Int::class.java)
         .converter(String::toInt)
         .desc("Minimum block size for memory allocator")
-        .build()
+        .get()
     )
 
     options.addOption(
@@ -111,7 +111,7 @@ object MainApp {
         .type(Int::class.java)
         .converter(String::toInt)
         .desc("Maximum block size for memory allocator")
-        .build()
+        .get()
     )
 
     options.addOption(
@@ -123,7 +123,7 @@ object MainApp {
         .type(Int::class.java)
         .converter(String::toInt)
         .desc("Size of segments for DashTable")
-        .build()
+        .get()
     )
 
     options.addOption(
@@ -135,7 +135,7 @@ object MainApp {
         .type(Int::class.java)
         .converter(String::toInt)
         .desc("Regular size for DashTable segments")
-        .build()
+        .get()
     )
 
     options.addOption(
@@ -147,7 +147,7 @@ object MainApp {
         .type(Int::class.java)
         .converter(String::toInt)
         .desc("Size of slots in buckets")
-        .build()
+        .get()
     )
 
     val parser = DefaultParser()
