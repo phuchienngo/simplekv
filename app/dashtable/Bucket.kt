@@ -134,12 +134,47 @@ class Bucket(slotSize: Int, private val species: VectorSpecies<Byte>) {
     while (bits != 0L) {
       val laneIndex = bits.countTrailingZeroBits()
       val entry = slots[laneIndex]
-      if (entry != null && entry.key.contentEquals(key)) {
+      if (entry != null && contentEquals(entry.key, key)) {
         return laneIndex
       }
       bits = bits and (bits - 1)
     }
 
     return -1
+  }
+
+  private fun contentEquals(array1: ByteArray, array2: ByteArray): Boolean {
+    if (array1.size != array2.size) {
+      return false
+    }
+    if (array1 === array2) {
+      return true
+    }
+    if (array1.isEmpty()) {
+      return true
+    }
+
+    val vectorSize = species.vectorByteSize()
+    val vectorLoops = array1.size / vectorSize
+
+    for (i in 0 until vectorLoops) {
+      val offset = i * vectorSize
+      val vec1 = ByteVector.fromArray(species, array1, offset)
+      val vec2 = ByteVector.fromArray(species, array2, offset)
+
+      if (vec1.eq(vec2).allTrue()) {
+        continue
+      }
+      return false
+    }
+
+    val remainingStart = vectorLoops * vectorSize
+    for (i in remainingStart until array1.size) {
+      if (array1[i] != array2[i]) {
+        return false
+      }
+    }
+
+    return true
   }
 }

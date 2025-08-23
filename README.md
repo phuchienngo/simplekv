@@ -27,6 +27,7 @@
 - [DashTable](https://github.com/dragonflydb/dragonfly/blob/main/docs/dashtable.md) data structure
   - Space-efficient trie data structure using contiguous arrays
   - Eliminating full-table rehashing when growing with [Extendible hashing](https://en.wikipedia.org/wiki/Extendible_hashing)
+  - SIMD acceleration for key lookup and comparison
 - Bazel build system for simplified development environment
 - Commands:
     - NO_OP, VERSION
@@ -62,7 +63,7 @@
       --jvmopt="-XX:InitiatingHeapOccupancyPercent=70" \
       --jvmopt="-XX:SoftMaxHeapSize=12G" \
       --jvmopt="-XX:MaxDirectMemorySize=32G" \
-      -- -p 11211 -n simplekv -w 2 -s 4
+      -- -p 11211 -n simplekv -w 4 -s 8
 ### Client Configuration
 - Tool: [memtier_benchmark](https://github.com/RedisLabs/memtier_benchmark)
 - Test command:
