@@ -1,9 +1,9 @@
 package app.dashtable
 
 import app.handler.CacheEntry
-import com.google.common.base.Preconditions
 import com.google.common.hash.HashCode
 import com.google.common.hash.Hashing
+import jdk.incubator.vector.ByteVector
 
 class Segment(
   private val segmentSize: Int,
@@ -11,11 +11,8 @@ class Segment(
   private val slotSize: Int
 ) {
   private var status: SegmentStatus = SegmentStatus.UNINITIALIZED
-  private val buckets: Array<Bucket>
-  init {
-    val species = VectorSpeciesUtils.selectBestSpecies(slotSize)
-    Preconditions.checkArgument(species != null)
-    buckets = Array(segmentSize) { Bucket(slotSize, species!!) }
+  private val buckets: Array<Bucket> = Array(segmentSize) {
+    return@Array Bucket(slotSize, ByteVector.SPECIES_PREFERRED)
   }
 
   enum class SegmentStatus {

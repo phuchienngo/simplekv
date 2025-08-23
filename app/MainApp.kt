@@ -1,7 +1,6 @@
 package app
 
 import app.config.Config
-import app.dashtable.VectorSpeciesUtils
 import app.server.Server
 import com.google.common.base.Preconditions
 import org.apache.commons.cli.DefaultParser
@@ -176,7 +175,6 @@ object MainApp {
     Preconditions.checkArgument(segmentSize > 0, "Segment size must be greater than 0")
     Preconditions.checkArgument(regularSize > 0, "Regular size must be greater than 0")
     Preconditions.checkArgument(slotSize > 0, "Slot size must be greater than 0")
-    Preconditions.checkArgument(VectorSpeciesUtils.selectBestSpecies(slotSize) != null, "Slot size $slotSize is not supported")
     Preconditions.checkArgument(regularSize < segmentSize, "Regular size must be less than segment size")
 
     return Config(

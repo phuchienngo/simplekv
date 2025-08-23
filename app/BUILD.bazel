@@ -18,7 +18,6 @@ kt_jvm_binary(
         "dashtable/Entry.kt",
         "dashtable/Segment.kt",
         "dashtable/SegmentDirectory.kt",
-        "dashtable/VectorSpeciesUtils.kt",
         "handler/AppendPrependProcessor.kt",
         "handler/BaseProcessor.kt",
         "handler/CacheEntry.kt",

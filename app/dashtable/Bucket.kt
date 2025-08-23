@@ -7,7 +7,7 @@ import jdk.incubator.vector.VectorMask
 import jdk.incubator.vector.VectorSpecies
 import java.util.Arrays
 
-class Bucket(slotSize: Int, private val species: VectorSpecies<Byte>) {
+class Bucket(private val slotSize: Int, private val species: VectorSpecies<Byte>) {
   private val slots = arrayOfNulls<Entry>(slotSize)
   private val fingerprints = ByteArray(slotSize)
   private val occupancy = ByteArray(slotSize)
@@ -15,25 +15,64 @@ class Bucket(slotSize: Int, private val species: VectorSpecies<Byte>) {
   private val zerosVec = ByteVector.broadcast(species, 0.toByte())
 
   fun put(key: ByteArray, value: CacheEntry, hashCode: HashCode, fingerprint: Byte, expireTime: Long): Boolean {
-    val maybeCandidates = findCandidates(fingerprint)
-    if (!maybeCandidates.anyTrue()) {
-      return checkAndSetSlotEntry(key, value, hashCode, fingerprint, expireTime)
+    val upperbound = species.loopBound(slotSize)
+    for (offset in 0 until upperbound step species.length()) {
+      if (tryReplaceSlot(fingerprint, offset, key, value, hashCode, expireTime)) {
+        return true
+      }
+    }
+    val remaining = slotSize - upperbound
+    if (remaining > 0) {
+      for (i in upperbound until slotSize) {
+        val entry = slots[i]
+        if (entry != null && contentEquals(entry.key, key)) {
+          entry.value = value
+          return true
+        }
+      }
     }
 
-    val exactSlot = findExactCandidate(maybeCandidates, key)
-    if (exactSlot != -1) {
-      slots[exactSlot]!!.value = value
-      return true
+    for (offset in 0 until upperbound step species.length()) {
+      if (checkAndSetSlotEntry(offset, key, value, hashCode, fingerprint, expireTime)) {
+        return true
+      }
     }
-    return checkAndSetSlotEntry(key, value, hashCode, fingerprint, expireTime)
+
+    if (remaining > 0) {
+      for (i in upperbound until slotSize) {
+        if (1.compareTo(occupancy[i]) == 0) {
+          continue
+        }
+        slots[i] = Entry(key, value, hashCode, fingerprint, expireTime)
+        fingerprints[i] = fingerprint
+        occupancy[i] = 1
+        return true
+      }
+    }
+
+    return false
   }
 
-  private fun checkAndSetSlotEntry(key: ByteArray, value: CacheEntry, hashCode: HashCode, fingerprint: Byte, expireTime: Long): Boolean {
-    val freeSlot = firstFreeSlot()
+  private fun tryReplaceSlot(fingerprint: Byte, offset: Int, key: ByteArray, value: CacheEntry, hashCode: HashCode, expireTime: Long): Boolean {
+    val maybeCandidates = findCandidatesVector(fingerprint, offset)
+    if (!maybeCandidates.anyTrue()) {
+      return checkAndSetSlotEntry(offset, key, value, hashCode, fingerprint, expireTime)
+    }
+
+    val exactSlot = findExactCandidateVector(maybeCandidates, key)
+    if (exactSlot != -1) {
+      slots[exactSlot + offset]!!.value = value
+      return true
+    }
+    return false
+  }
+
+  private fun checkAndSetSlotEntry(offset: Int, key: ByteArray, value: CacheEntry, hashCode: HashCode, fingerprint: Byte, expireTime: Long): Boolean {
+    var freeSlot = firstFreeSlot(offset)
     if (freeSlot == -1) {
       return false
     }
-
+    freeSlot += offset
     slots[freeSlot] = Entry(key, value, hashCode, fingerprint, expireTime)
     fingerprints[freeSlot] = fingerprint
     occupancy[freeSlot] = 1
@@ -41,20 +80,41 @@ class Bucket(slotSize: Int, private val species: VectorSpecies<Byte>) {
   }
 
   fun get(key: ByteArray, fingerprint: Byte, now: Long): Entry? {
-    val maybeCandidates = findCandidates(fingerprint)
-    if (!maybeCandidates.anyTrue()) {
+    val upperbound = species.loopBound(slotSize)
+    for (offset in 0 until upperbound step species.length()) {
+      val maybeCandidates = findCandidatesVector(fingerprint, offset)
+      if (!maybeCandidates.anyTrue()) {
+        continue
+      }
+      val index = findExactCandidateVector(maybeCandidates, key)
+      if (index < 0) {
+        continue
+      }
+
+      val entry = slots[index + offset]
+      if (isExpiredEntry(entry!!, now)) {
+        remove(key, fingerprint)
+        return null
+      }
+      return entry
+    }
+    val remaining = slotSize - upperbound
+    if (remaining <= 0) {
       return null
     }
-    val index = findExactCandidate(maybeCandidates, key)
-    if (index == -1) {
-      return null
+
+    for (i in upperbound until slotSize) {
+      val entry = slots[i]
+      if (entry != null && contentEquals(entry.key, key)) {
+        if (isExpiredEntry(entry, now)) {
+          remove(key, fingerprint)
+          return null
+        }
+        return entry
+      }
     }
-    val entry = slots[index]
-    if (isExpiredEntry(entry!!, now)) {
-      remove(key, fingerprint)
-      return null
-    }
-    return entry
+
+    return null
   }
 
   fun clear() {
@@ -64,18 +124,37 @@ class Bucket(slotSize: Int, private val species: VectorSpecies<Byte>) {
   }
 
   fun remove(key: ByteArray, fingerprint: Byte): Boolean {
-    val maybeCandidates = findCandidates(fingerprint)
-    if (!maybeCandidates.anyTrue()) {
+    val upperbound = species.loopBound(slotSize)
+    for (offset in 0 until upperbound step species.length()) {
+      val maybeCandidates = findCandidatesVector(fingerprint, offset)
+      if (!maybeCandidates.anyTrue()) {
+        continue
+      }
+      val index = findExactCandidateVector(maybeCandidates, key)
+      if (index == -1) {
+        continue
+      }
+      slots[index + offset] = null
+      occupancy[index + offset] = 0
+      fingerprints[index + offset] = 0
+      return true
+    }
+    val remaining = slotSize - upperbound
+    if (remaining <= 0) {
       return false
     }
-    val index = findExactCandidate(maybeCandidates, key)
-    if (index == -1) {
-      return false
+
+    for (i in upperbound until slotSize) {
+      val entry = slots[i]
+      if (entry != null && contentEquals(entry.key, key)) {
+        slots[i] = null
+        occupancy[i] = 0
+        fingerprints[i] = 0
+        return true
+      }
     }
-    slots[index] = null
-    occupancy[index] = 0
-    fingerprints[index] = 0
-    return true
+
+    return false
   }
 
   fun entries(): List<Entry> {
@@ -83,7 +162,29 @@ class Bucket(slotSize: Int, private val species: VectorSpecies<Byte>) {
   }
 
   fun cleanExpiredItems(now: Long): Boolean {
-    val occupancyVec = ByteVector.fromArray(species, occupancy, 0)
+    val upperbound = species.loopBound(slotSize)
+    var totalRemoved = 0
+    for (offset in 0 until upperbound step species.length()) {
+      totalRemoved += cleanExpiredItemsOffset(now, offset)
+    }
+
+    val remaining = slotSize - upperbound
+    if (remaining > 0) {
+      for (i in upperbound until slotSize) {
+        val entry = slots[i]
+        if (entry != null && isExpiredEntry(entry, now)) {
+          slots[i] = null
+          occupancy[i] = 0
+          fingerprints[i] = 0
+          totalRemoved += 1
+        }
+      }
+    }
+    return totalRemoved > 0
+  }
+
+  private fun cleanExpiredItemsOffset(now: Long, offset: Int): Int {
+    val occupancyVec = ByteVector.fromArray(species, occupancy, offset)
     val occupancyMask = occupancyVec.eq(onesVec)
     val maskLong = occupancyMask.toLong()
     var bits = maskLong
@@ -100,25 +201,25 @@ class Bucket(slotSize: Int, private val species: VectorSpecies<Byte>) {
       }
       bits = bits and (bits - 1)
     }
-    return removed > 0
+    return removed
   }
 
   private fun isExpiredEntry(entry: Entry, now: Long): Boolean {
     return entry.expireTime != 0L && entry.expireTime <= now
   }
 
-  private fun findCandidates(fingerprint: Byte): VectorMask<Byte> {
-    val occupancyVec = ByteVector.fromArray(species, occupancy, 0)
+  private fun findCandidatesVector(fingerprint: Byte, offset: Int): VectorMask<Byte> {
+    val occupancyVec = ByteVector.fromArray(species, occupancy, offset)
     val occupancyMask = occupancyVec.eq(onesVec)
 
-    val fingerprintVec = ByteVector.fromArray(species, fingerprints, 0)
+    val fingerprintVec = ByteVector.fromArray(species, fingerprints, offset)
     val testFingerprintVec = ByteVector.broadcast(species, fingerprint)
     val fingerprintMask = fingerprintVec.eq(testFingerprintVec)
     return occupancyMask.and(fingerprintMask)
   }
 
-  private fun firstFreeSlot(): Int {
-    val occupancyVec = ByteVector.fromArray(species, occupancy, 0)
+  private fun firstFreeSlot(offset: Int): Int {
+    val occupancyVec = ByteVector.fromArray(species, occupancy, offset)
     val freeMask = occupancyVec.eq(zerosVec)
     return if (freeMask.anyTrue()) {
       freeMask.firstTrue()
@@ -127,7 +228,7 @@ class Bucket(slotSize: Int, private val species: VectorSpecies<Byte>) {
     }
   }
 
-  private fun findExactCandidate(maybeCandidates: VectorMask<Byte>, key: ByteArray): Int {
+  private fun findExactCandidateVector(maybeCandidates: VectorMask<Byte>, key: ByteArray): Int {
     val maskLong = maybeCandidates.toLong()
     var bits = maskLong
 
@@ -154,22 +255,21 @@ class Bucket(slotSize: Int, private val species: VectorSpecies<Byte>) {
       return true
     }
 
-    val vectorSize = species.vectorByteSize()
-    val vectorLoops = array1.size / vectorSize
-
-    for (i in 0 until vectorLoops) {
-      val offset = i * vectorSize
+    val upperbound = species.loopBound(array1.size)
+    for (offset in 0 until upperbound step species.length()) {
       val vec1 = ByteVector.fromArray(species, array1, offset)
       val vec2 = ByteVector.fromArray(species, array2, offset)
-
       if (vec1.eq(vec2).allTrue()) {
         continue
       }
       return false
     }
 
-    val remainingStart = vectorLoops * vectorSize
-    for (i in remainingStart until array1.size) {
+    val remaining = array2.size - upperbound
+    if (remaining <= 0) {
+      return true
+    }
+    for (i in upperbound until remaining) {
       if (array1[i] != array2[i]) {
         return false
       }
