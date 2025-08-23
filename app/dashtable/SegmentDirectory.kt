@@ -1,12 +1,13 @@
 package app.dashtable
 
+import app.handler.CacheEntry
 import com.google.common.hash.HashCode
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.Clock
 import kotlin.math.pow
 
-class SegmentDirectory<K, V>(
+class SegmentDirectory(
   private val segmentSize: Int,
   private val regularSize: Int,
   private val slotSize: Int,
@@ -15,13 +16,13 @@ class SegmentDirectory<K, V>(
   companion object {
     private val LOG: Logger = LoggerFactory.getLogger(SegmentDirectory::class.java)
   }
-  private var segments = Array<Segment<K, V>>(1) {
-    val segment = Segment<K, V>(segmentSize, regularSize, slotSize)
+  private var segments = Array(1) {
+    val segment = Segment(segmentSize, regularSize, slotSize)
     segment.use()
     return@Array segment
   }
 
-  fun put(key: K, value: V, hashCode: HashCode, expireTime: Long): Boolean {
+  fun put(key: ByteArray, value: CacheEntry, hashCode: HashCode, fingerprint: Byte, expireTime: Long): Boolean {
     var bitIndex = -1
     var segmentIndex = 0
     val now = clock.millis()
@@ -32,10 +33,10 @@ class SegmentDirectory<K, V>(
       val segment = segments[segmentIndex]
       when (segment.getStatus()) {
         Segment.SegmentStatus.IN_USED -> {
-          if (segment.put(key, value, hashCode, expireTime)) {
+          if (segment.put(key, value, hashCode, fingerprint, expireTime)) {
             return true
           }
-          if (segment.cleanExpiredEntries(now) && segment.put(key, value, hashCode, expireTime)) {
+          if (segment.cleanExpiredEntries(now) && segment.put(key, value, hashCode, fingerprint, expireTime)) {
             return true
           }
           splitSegment(segment, segmentIndex, bitIndex + 1)
@@ -56,7 +57,7 @@ class SegmentDirectory<K, V>(
     return false
   }
 
-  fun get(key: K, hashCode: HashCode): Entry<K, V>? {
+  fun get(key: ByteArray, hashCode: HashCode, fingerprint: Byte): Entry? {
     var bitIndex = -1
     var segmentIndex = 0
     val now = clock.millis()
@@ -66,7 +67,7 @@ class SegmentDirectory<K, V>(
     ) {
       val segment = segments[segmentIndex]
       if (segment.getStatus() == Segment.SegmentStatus.IN_USED) {
-        return segment.get(key, hashCode, now)
+        return segment.get(key, hashCode, fingerprint, now)
       }
       segmentIndex = if (isBitSet(hashCode, ++bitIndex)) {
         2 * segmentIndex + 2
@@ -77,7 +78,7 @@ class SegmentDirectory<K, V>(
     return null
   }
 
-  fun remove(key: K, hashCode: HashCode): Boolean {
+  fun remove(key: ByteArray, hashCode: HashCode, fingerprint: Byte): Boolean {
     var bitIndex = -1
     var segmentIndex = 0
     while (bitIndex < hashCode.bits()
@@ -86,7 +87,7 @@ class SegmentDirectory<K, V>(
     ) {
       val segment = segments[segmentIndex]
       if (segment.getStatus() == Segment.SegmentStatus.IN_USED) {
-        return segment.remove(key, hashCode)
+        return segment.remove(key, fingerprint, hashCode)
       }
       segmentIndex = if (isBitSet(hashCode, ++bitIndex)) {
         2 * segmentIndex + 2
@@ -113,7 +114,7 @@ class SegmentDirectory<K, V>(
     return ((bytes[byteIndex].toInt() shr bitPosition) and 1) == 1
   }
 
-  private fun splitSegment(segment: Segment<K, V>, segmentIndex: Int, bitIndex: Int) {
+  private fun splitSegment(segment: Segment, segmentIndex: Int, bitIndex: Int) {
     val oldBuckets = segment.obsolete()
     val offBitIndex = segmentIndex * 2 + 1
     val onBitIndex = segmentIndex * 2 + 2
@@ -138,12 +139,12 @@ class SegmentDirectory<K, V>(
     }
   }
 
-  private fun rehashing(bucket: Bucket<K, V>, bitIndex: Int, onBitSegment: Segment<K, V>, offBitSegment: Segment<K, V>) {
+  private fun rehashing(bucket: Bucket, bitIndex: Int, onBitSegment: Segment, offBitSegment: Segment) {
     for (entry in bucket.entries()) {
       if (isBitSet(entry.hashCode, bitIndex)) {
-        onBitSegment.put(entry.key, entry.value, entry.hashCode, entry.expireTime)
+        onBitSegment.put(entry.key, entry.value, entry.hashCode, entry.fingerprint, entry.expireTime)
       } else {
-        offBitSegment.put(entry.key, entry.value, entry.hashCode, entry.expireTime)
+        offBitSegment.put(entry.key, entry.value, entry.hashCode, entry.fingerprint, entry.expireTime)
       }
     }
     bucket.clear()

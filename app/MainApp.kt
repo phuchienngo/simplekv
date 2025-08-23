@@ -1,6 +1,7 @@
 package app
 
 import app.config.Config
+import app.dashtable.VectorSpeciesUtils
 import app.server.Server
 import com.google.common.base.Preconditions
 import org.apache.commons.cli.DefaultParser
@@ -160,7 +161,7 @@ object MainApp {
     val maxBlockSize = cmd.getParsedOptionValue("maxbs", 16777216)
     val segmentSize = cmd.getParsedOptionValue("ss", 60)
     val regularSize = cmd.getParsedOptionValue("rs", 54)
-    val slotSize = cmd.getParsedOptionValue("sls", 14)
+    val slotSize = cmd.getParsedOptionValue("sls", 16)
     Preconditions.checkArgument(port in 0..65535, "Port number must be between 0 and 65535")
     Preconditions.checkArgument(isPortAvailable(port), "Port number $port is already in use")
     Preconditions.checkArgument(workerNum > 0, "Worker number must be greater than 0")
@@ -175,6 +176,7 @@ object MainApp {
     Preconditions.checkArgument(segmentSize > 0, "Segment size must be greater than 0")
     Preconditions.checkArgument(regularSize > 0, "Regular size must be greater than 0")
     Preconditions.checkArgument(slotSize > 0, "Slot size must be greater than 0")
+    Preconditions.checkArgument(VectorSpeciesUtils.selectBestSpecies(slotSize) != null, "Slot size $slotSize is not supported")
     Preconditions.checkArgument(regularSize < segmentSize, "Regular size must be less than segment size")
 
     return Config(

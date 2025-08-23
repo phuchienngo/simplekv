@@ -15,7 +15,7 @@ class MainHandler: Handler {
   constructor(config: Config) {
     this.config = config
     val clock = Clock.systemUTC()
-    val dashTable = DashTable<CacheEntry>(config.segmentSize, config.regularSize, config.slotSize, clock)
+    val dashTable = DashTable(config.segmentSize, config.regularSize, config.slotSize, clock)
     val memoryAllocator = MemoryAllocator(config.minBlockSize, config.maxBlockSize)
     val appendPrependProcessor = AppendPrependProcessor(dashTable, memoryAllocator)
     val deleteProcessor = DeleteProcessor(dashTable, memoryAllocator)

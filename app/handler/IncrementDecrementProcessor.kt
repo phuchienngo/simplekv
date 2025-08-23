@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets
 import java.time.Clock
 
 class IncrementDecrementProcessor(
-  private val dashTable: DashTable<CacheEntry>,
+  private val dashTable: DashTable,
   private val memoryAllocator: MemoryAllocator,
   private val clock: Clock,
 ): BaseProcessor() {
@@ -76,7 +76,7 @@ class IncrementDecrementProcessor(
     }
   }
 
-  private fun applyAndResponse(key: String, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes, ttl: Int, cacheEntry: CacheEntry) {
+  private fun applyAndResponse(key: ByteArray, newValue: ULong, cas: Long, event: Event, command: CommandOpCodes, ttl: Int, cacheEntry: CacheEntry) {
     cacheEntry.extra?.let(memoryAllocator::freeBlock)
     cacheEntry.value?.let(memoryAllocator::freeBlock)
     cacheEntry.value = createCounterValueBuffer(newValue)

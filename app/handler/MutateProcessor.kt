@@ -12,7 +12,7 @@ import java.nio.ByteBuffer
 import java.time.Clock
 
 class MutateProcessor(
-  private val dashTable: DashTable<CacheEntry>,
+  private val dashTable: DashTable,
   private val memoryAllocator: MemoryAllocator,
   private val clock: Clock,
 ): BaseProcessor() {
@@ -63,7 +63,7 @@ class MutateProcessor(
     }
   }
 
-  private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: String, value: ByteBuffer?, extras: ByteBuffer?, cas: Long, ttl: Int, cacheEntry: CacheEntry) {
+  private fun addOrUpdateAndReply(command: CommandOpCodes, event: Event, key: ByteArray, value: ByteBuffer?, extras: ByteBuffer?, cas: Long, ttl: Int, cacheEntry: CacheEntry) {
     cacheEntry.value?.let(memoryAllocator::freeBlock)
     cacheEntry.extra?.let(memoryAllocator::freeBlock)
     cacheEntry.value = value?.let {

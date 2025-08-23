@@ -1,25 +1,40 @@
 package app.dashtable
 
+import app.handler.CacheEntry
+import com.google.common.hash.HashCode
 import com.google.common.hash.Hashing
 import java.time.Clock
 
-class DashTable<V>(segmentSize: Int, regularSize: Int, slotSize: Int, clock: Clock) {
-  private val directory = SegmentDirectory<String, V>(segmentSize, regularSize, slotSize, clock)
-  private val hashing = Hashing.farmHashFingerprint64()
+class DashTable(segmentSize: Int, regularSize: Int, slotSize: Int, clock: Clock) {
+  private val directory = SegmentDirectory(segmentSize, regularSize, slotSize, clock)
+  private val hashing = Hashing.sipHash24()
 
-  fun get(key: String): V? {
-    return directory.get(key, hashing.hashString(key, Charsets.US_ASCII))?.value
+  fun get(key: ByteArray): CacheEntry? {
+    val hashCode = hashing.hashBytes(key)
+    val fingerprint = calcFingerprint(hashCode)
+    return directory.get(key, hashCode, fingerprint)?.value
   }
 
-  fun put(key: String, value: V, expireTime: Long): Boolean {
-    return directory.put(key, value, hashing.hashString(key, Charsets.US_ASCII), expireTime)
+  fun put(key: ByteArray, value: CacheEntry, expireTime: Long): Boolean {
+    val hashCode = hashing.hashBytes(key)
+    val fingerprint = calcFingerprint(hashCode)
+    return directory.put(key, value, hashCode, fingerprint, expireTime)
   }
 
-  fun remove(key: String) {
-    directory.remove(key, hashing.hashString(key, Charsets.US_ASCII))
+  fun remove(key: ByteArray) {
+    val hashCode = hashing.hashBytes(key)
+    val fingerprint = calcFingerprint(hashCode)
+    directory.remove(key, hashCode, fingerprint)
   }
 
-  fun containsKey(key: String): Boolean {
-    return directory.get(key, hashing.hashString(key, Charsets.US_ASCII)) != null
+  fun containsKey(key: ByteArray): Boolean {
+    val hashCode = hashing.hashBytes(key)
+    val fingerprint = calcFingerprint(hashCode)
+    return directory.get(key, hashCode, fingerprint) != null
+  }
+
+  private fun calcFingerprint(hashCode: HashCode): Byte {
+    val hash64 = hashCode.asLong()
+    return ((hash64 ushr 56) and 0xFF).toByte()
   }
 }

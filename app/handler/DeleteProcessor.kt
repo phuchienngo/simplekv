@@ -10,7 +10,7 @@ import app.utils.Responses
 import app.utils.Validators
 
 class DeleteProcessor(
-  private val dashTable: DashTable<CacheEntry>,
+  private val dashTable: DashTable,
   private val memoryAllocator: MemoryAllocator
 ): BaseProcessor() {
   @Suppress("DuplicatedCode")

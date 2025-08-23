@@ -9,7 +9,7 @@ import app.utils.Responses
 import app.utils.Validators
 
 class GetProcessor(
-  private val dashTable: DashTable<CacheEntry>
+  private val dashTable: DashTable
 ): BaseProcessor() {
   @Suppress("DuplicatedCode")
   override fun process(event: Event, command: CommandOpCodes) {

@@ -1,17 +1,22 @@
 package app.dashtable
 
+import app.handler.CacheEntry
+import com.google.common.base.Preconditions
 import com.google.common.hash.HashCode
 import com.google.common.hash.Hashing
 
-class Segment<K, V>(
+class Segment(
   private val segmentSize: Int,
   private val regularSize: Int,
-  private val buckets: Array<Bucket<K, V>>,
+  private val slotSize: Int
 ) {
   private var status: SegmentStatus = SegmentStatus.UNINITIALIZED
-
-  constructor(segmentSize: Int, regularSize: Int, slotSize: Int):
-      this(segmentSize, regularSize, Array(segmentSize) { Bucket(slotSize) })
+  private val buckets: Array<Bucket>
+  init {
+    val species = VectorSpeciesUtils.selectBestSpecies(slotSize)
+    Preconditions.checkArgument(species != null)
+    buckets = Array(segmentSize) { Bucket(slotSize, species!!) }
+  }
 
   enum class SegmentStatus {
     UNINITIALIZED,
@@ -23,60 +28,62 @@ class Segment<K, V>(
     return status
   }
 
-  fun get(key: K, hashCode: HashCode, now: Long): Entry<K, V>? {
+  fun get(key: ByteArray, hashCode: HashCode, fingerprint: Byte, now: Long): Entry? {
     if (status != SegmentStatus.IN_USED) {
       return null
     }
 
     val index = Hashing.consistentHash(hashCode, regularSize)
-    var result = buckets[index].get(key, now)
+    var result = buckets[index].get(key, fingerprint, now)
     if (result != null) {
       return result
     }
     if (index + 1 < regularSize) {
-      result = buckets[index + 1].get(key, now)
+      result = buckets[index + 1].get(key, fingerprint, now)
       if (result != null) {
         return result
       }
     }
     for (stashIndex in regularSize until segmentSize) {
-      result = buckets[stashIndex].get(key, now) ?: continue
+      result = buckets[stashIndex].get(key, fingerprint, now) ?: continue
       return result
     }
     return null
   }
 
-  fun put(key: K, value: V, hashCode: HashCode, expireTime: Long): Boolean {
+  fun put(key: ByteArray, value: CacheEntry, hashCode: HashCode, fingerprint: Byte, expireTime: Long): Boolean {
     if (status != SegmentStatus.IN_USED) {
       return false
     }
 
     val index = Hashing.consistentHash(hashCode, regularSize)
-    if (buckets[index].put(key, value, hashCode, expireTime) || index + 1 < regularSize && buckets[index + 1].put(key, value, hashCode, expireTime)) {
+    if (buckets[index].put(key, value, hashCode, fingerprint, expireTime)
+      || index + 1 < regularSize && buckets[index + 1].put(key, value, hashCode, fingerprint, expireTime)
+    ) {
       return true
     }
     for (stashIndex in regularSize until segmentSize) {
-      if (buckets[stashIndex].put(key, value, hashCode, expireTime)) {
+      if (buckets[stashIndex].put(key, value, hashCode, fingerprint, expireTime)) {
         return true
       }
     }
     return false
   }
 
-  fun remove(key: K, hashCode: HashCode): Boolean {
+  fun remove(key: ByteArray, fingerprint: Byte, hashCode: HashCode): Boolean {
     if (status != SegmentStatus.IN_USED) {
       return false
     }
 
     val index = Hashing.consistentHash(hashCode, regularSize)
-    if (buckets[index].remove(key)) {
+    if (buckets[index].remove(key, fingerprint)) {
       return true
     }
-    if (index + 1 < regularSize && buckets[index + 1].remove(key)) {
+    if (index + 1 < regularSize && buckets[index + 1].remove(key, fingerprint)) {
       return true
     }
     for (stashIndex in regularSize until segmentSize) {
-      if (buckets[stashIndex].remove(key)) {
+      if (buckets[stashIndex].remove(key, fingerprint)) {
         return true
       }
     }
@@ -87,7 +94,7 @@ class Segment<K, V>(
     status = SegmentStatus.IN_USED
   }
 
-  fun obsolete(): Array<Bucket<K, V>> {
+  fun obsolete(): Array<Bucket> {
     status = SegmentStatus.OBSOLETED
     return buckets
   }
