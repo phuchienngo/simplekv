@@ -40,19 +40,17 @@
 ### Hardware Specification
 - VM in GCP within the same region
 - Server: 
-  - Machine Type: `c4-standard-16`
-  - vCPUs: 16
-  - Memory: 60GB
-  - Network: 16Gbps
+  - Machine Type: `c4d-standard-32`
+  - vCPUs: 32
+  - Memory: 124GB
+  - Network: 23Gbps
 - Client:
-  - Machine Type: `c3-highcpu-8`
-  - vCPUs: 8
-  - Memory: 16GB
-  - Network: 10Gbps
+  - Machine Type: `c3-standard-22`
+  - vCPUs: 22
+  - Memory: 88GB
+  - Network: 23Gbps
 ### Server Configuration
 - JVM: OpenJDK 21
-- Workers: 2 threads
-- Selectors: 4 threads
 - Test command:
   ```bash
       bazel run //app:main_app \
@@ -62,7 +60,7 @@
       --jvmopt="-XX:+ZGenerational" \
       --jvmopt="-XX:InitiatingHeapOccupancyPercent=70" \
       --jvmopt="-XX:SoftMaxHeapSize=12G" \
-      --jvmopt="-XX:MaxDirectMemorySize=32G" \
+      --jvmopt="-XX:MaxDirectMemorySize=120G" \
       -- -p 11211 -n simplekv -w 4 -s 8
 ### Client Configuration
 - Tool: [memtier_benchmark](https://github.com/RedisLabs/memtier_benchmark)
@@ -73,9 +71,9 @@
 ### Results
 | Operation          | Throughput (ops/sec)      | P99 Latency (ms) |
 |--------------------|---------------------------|------------------|
-| SET                | 359,243                   | 1.19             |
-| GET                | 728,575                   | 0.36             |
-| Mixed(1 SET/3 GET) | 573,537 (132,358/441,179) | 0.72 (0.73/0.71) |
+| SET                | 807,184                   | 0.57             |
+| GET                | 1,003,849                 | 0.25             |
+| Mixed(1 SET/3 GET) | 974,490 (224,885/749,604) | 0.27 (0.28/0.27) |
 ## Todo
 - Eviction
 - Write-ahead log
