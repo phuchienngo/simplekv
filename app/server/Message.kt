@@ -82,22 +82,23 @@ class Message(
   internal fun write(): Boolean {
     if (state == State.WRITING) {
       try {
-        while (buffer.hasRemaining()) {
-          val bytesWritten = channelSocket.write(buffer)
-          return when {
-            bytesWritten > 0 -> continue
-            bytesWritten == 0 -> true
-            else -> false
-          }
+        val writtenBytes = channelSocket.write(buffer)
+        if (writtenBytes < 0) {
+          return false
         }
-        prepareRead()
       } catch (e: Exception) {
         LOG.error("Error writing to channel", e)
         return false
       }
+
+      if (!buffer.hasRemaining()) {
+        prepareRead()
+      }
+      return true
     }
 
-    return true
+    LOG.error("Write called in invalid state [{}]!", state)
+    return false
   }
 
   @JvmSynthetic
